@@ -99,7 +99,12 @@ chrome.runtime.onMessage.addListener(function (msg, _sender, sendResponse) {
     return true; // async response
   }
   if (msg && msg.type === "config") {
-    sendResponse({ configured: !!((self.PAISA_CONFIG && self.PAISA_CONFIG.apiUrl) || "") });
+    var cfg = self.PAISA_CONFIG || {};
+    sendResponse({
+      configured: !!(cfg.apiUrl || ""),
+      region: cfg.region || "ap-south-1",
+      roleTemplateUrl: cfg.roleTemplateUrl || "",
+    });
     return false;
   }
   if (msg && msg.type === "api") {

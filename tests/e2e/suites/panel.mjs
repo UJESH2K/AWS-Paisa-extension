@@ -131,6 +131,36 @@ try {
   await d.click("Sign in");
   c.check("someone with no connected account is told to connect one", await d.has("Connect your AWS account"), true);
 
+  // The whole role hand-off happens here, in the console the user is already
+  // signed in to, rather than sending them off to a separate dashboard.
+  await sleep(600);
+  const connectText = await d.text();
+  c.check("it shows the connect ID for the role's trust policy", connectText.includes("Connect ID ext"), true);
+  c.check("it lists exactly what Paisa will be able to read", connectText.includes("ce:GetCostAndUsage"), true);
+  const link = await page.ev(`(()=>{const a=${PANEL_SHADOW}.getElementById('roleLink'); return a && {href:a.href, target:a.target, rel:a.rel};})()`);
+  c.check("the one-click link opens CloudFormation quick-create", link?.href, (u) => typeof u === "string" && u.includes("/stacks/quickcreate?"));
+  c.check("with the template and the user's ExternalId filled in", link?.href, (u) => u.includes("templateURL=") && u.includes("param_ExternalId=ext"));
+  c.check("in the configured region", link?.href, (u) => u.startsWith("https://ap-south-1.console.aws.amazon.com/cloudformation/"));
+  if (shotDir) await page.screenshot(`${shotDir}/panel-connect.png`);
+  c.check("and opens safely in a new tab", `${link?.target} ${link?.rel}`, (s) => s.includes("_blank") && s.includes("noopener"));
+
+  c.check(
+    "a malformed ARN leaves the connect button disabled",
+    await page.ev(`(()=>{
+      const i=${PANEL_SHADOW}.getElementById('arn');
+      i.value='not-an-arn'; i.dispatchEvent(new Event('input',{bubbles:true}));
+      return ${PANEL_SHADOW}.getElementById('connectBtn').disabled;
+    })()`),
+    true,
+  );
+  await d.type("arn", "arn:aws:iam::123456789012:role/PaisaBrokenRole");
+  await d.click("Verify and connect");
+  c.check("a role Paisa cannot assume reports why", await d.has("couldn't assume that role"), true);
+
+  await d.type("arn", "arn:aws:iam::123456789012:role/PaisaReadOnlyRole");
+  await d.click("Verify and connect");
+  c.check("connecting a working role shows the bill", await d.has("Expected bill this month"), true);
+
   await d.click("Sign out");
   await d.has("See your AWS bill in rupees");
   await d.click("See a sample");

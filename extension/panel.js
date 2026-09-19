@@ -72,11 +72,12 @@
     ".bar i.other{background:var(--other)}",
 
     ".actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}",
-    "button.btn{height:32px;padding:0 20px;border:1px solid var(--accent);border-radius:20px;background:transparent;",
+    "button.btn,a.btn{display:inline-flex;align-items:center;height:32px;padding:0 20px;border:1px solid var(--accent);",
+    "border-radius:20px;background:transparent;text-decoration:none;",
     "color:var(--accent);font-family:var(--font);font-weight:700;font-size:14px;line-height:1;cursor:pointer}",
-    "button.btn:hover:not(:disabled){background:var(--raised)}",
-    "button.primary{background:var(--accent);color:var(--on-accent)}",
-    "button.primary:hover:not(:disabled){background:var(--accent-hover);border-color:var(--accent-hover)}",
+    "button.btn:hover:not(:disabled),a.btn:hover{background:var(--raised)}",
+    "button.primary,a.primary{background:var(--accent);color:var(--on-accent)}",
+    "button.primary:hover:not(:disabled),a.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}",
     "button:disabled{opacity:.45;cursor:not-allowed}",
     "button.link{padding:0;border:0;background:none;color:var(--accent);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer}",
 
@@ -98,7 +99,9 @@
     ".spin{color:var(--muted)}",
   ].join("\n");
 
-  var state = { open: false, view: "loading", session: null, summary: null, sample: false, email: "", error: "", notice: "", noticeKind: "info", busy: false, last: null };
+  var ROLE_ARN_RE = /^arn:aws:iam::\d{12}:role\/[\w+=,.@/-]{1,200}$/;
+  var state = { open: false, view: "loading", session: null, me: null, config: {}, summary: null, sample: false,
+    email: "", arn: "", arnGuess: undefined, error: "", notice: "", noticeKind: "info", busy: false, last: null };
   var host, root, fabAmt, drawer, body, headChip;
 
   function h(tag, props, kids) {
@@ -259,15 +262,104 @@
     ];
   }
 
+  // The user is already signed in to the AWS console, which is exactly where
+  // the role gets created, so the whole connect flow happens here rather than
+  // sending them off to a separate dashboard.
+  function quickCreateUrl() {
+    var region = state.config.region || "ap-south-1";
+    var q = new URLSearchParams({
+      templateURL: state.config.roleTemplateUrl,
+      stackName: "PaisaReadOnly",
+      param_ExternalId: state.me ? state.me.externalId : "",
+    });
+    return "https://" + region + ".console.aws.amazon.com/cloudformation/home?region=" + region + "#/stacks/quickcreate?" + q;
+  }
+
+  // Best effort: the console shows the account ID, so the ARN can usually be
+  // filled in for the user. Always editable, and never presented as certain.
+  function detectAccountId() {
+    try {
+      var html = document.documentElement.innerHTML;
+      var keyed = /"account(?:Id|_id)"\s*:\s*"(\d{12})"/i.exec(html) || /account(?:Id|-id)["'\s:=]+(\d{12})/i.exec(html);
+      if (keyed) return keyed[1];
+      // Failing that, a 12-digit number sitting near the word "account".
+      var near = /account[^0-9]{0,40}(\d{4}-?\d{4}-?\d{4})/i.exec(document.body.innerText || "");
+      if (near) return near[1].replace(/-/g, "");
+    } catch (e) {
+      /* the console's markup is not ours; never break on it */
+    }
+    return null;
+  }
+
   function viewConnect() {
-    return [
+    var ready = !!(state.config.roleTemplateUrl && state.me);
+    var guessed = state.arnGuess === undefined ? (state.arnGuess = detectAccountId()) : state.arnGuess;
+    var input = h("input", {
+      id: "arn",
+      placeholder: "arn:aws:iam::123456789012:role/PaisaReadOnlyRole",
+      spellcheck: "false",
+      autocomplete: "off",
+      value: state.arn || (guessed ? "arn:aws:iam::" + guessed + ":role/PaisaReadOnlyRole" : ""),
+      oninput: function (e) {
+        state.arn = e.target.value;
+        var btn = root.getElementById("connectBtn");
+        if (btn) btn.disabled = !ROLE_ARN_RE.test(state.arn.trim()) || state.busy;
+      },
+    });
+    var out = [
       h("h2", { text: "Connect your AWS account" }),
-      h("p", { class: "sub", text: "You're signed in as " + (state.session ? state.session.email : "") + ", but Paisa can't read your costs yet. Create the read-only role once (about a minute) using the Paisa dashboard." }),
-      msg("info", state.error),
-      h("div", { class: "actions" }, [
-        h("button", { class: "btn", onclick: function () { signOut(); }, text: "Sign out" }),
-      ]),
+      h("p", { class: "sub", text: "Signed in as " + (state.session ? state.session.email : "") + ". Paisa needs read-only access to this account's cost data. It never asks for your access keys." }),
     ];
+
+    if (!ready) {
+      out.push(
+        msg("info", state.config.roleTemplateUrl
+          ? "Loading your connect ID…"
+          : "This build has no role template URL configured (roleTemplateUrl in config.js), so the one-click role link isn't available yet."),
+      );
+    } else {
+      out.push(
+        h("p", { class: "note", text: "Step 1. Opens CloudFormation in this account with everything filled in. Review it, tick the acknowledgement, and create the stack." }),
+        h("div", { class: "actions" }, [
+          h("a", {
+            id: "roleLink",
+            class: "btn primary",
+            href: quickCreateUrl(),
+            target: "_blank",
+            rel: "noopener noreferrer",
+            text: "Create the read-only role ↗",
+          }),
+        ]),
+        h("p", { class: "note", style: "margin-top:14px", text: "Step 2. When the stack finishes, copy RoleArn from its Outputs tab." + (guessed ? " We filled in what looks like this account's ID — check it." : "") }),
+        input,
+        h("div", { class: "actions" }, [
+          h("button", {
+            id: "connectBtn",
+            class: "btn primary",
+            disabled: !ROLE_ARN_RE.test((state.arn || input.value || "").trim()) || state.busy,
+            text: state.busy ? "Verifying…" : "Verify and connect",
+            onclick: function () {
+              var arn = (state.arn || input.value || "").trim();
+              run(function () {
+                return api("POST", "/connect", { roleArn: arn }).then(function (r) {
+                  if (!r.ok) return fail(r);
+                  state.error = "";
+                  return loadBill(true);
+                });
+              });
+            },
+          }),
+        ]),
+        h("p", { class: "note", style: "margin-top:14px", text: "Paisa can read ce:GetCostAndUsage, ce:GetCostForecast and ce:GetDimensionValues, plus two CloudWatch billing reads. Billing figures only: no resources, no data, no write access. Delete the stack to revoke it." }),
+      );
+    }
+
+    out.push(msg("err", state.error));
+    out.push(h("div", { class: "foot" }, [
+      state.me ? h("span", { text: "Connect ID " + state.me.externalId }) : null,
+      h("button", { class: "link", onclick: signOut, text: "Sign out" }),
+    ]));
+    return out;
   }
 
   function viewError() {
@@ -386,7 +478,13 @@
         state.error = "Your session expired. Sign in again.";
       } else if (r.status === 409) {
         state.view = "connect";
-        state.error = r.error;
+        state.error = "";
+        if (!state.me) {
+          api("GET", "/me", null).then(function (me) {
+            if (me.ok) state.me = me.data;
+            render();
+          });
+        }
       } else if (r.error === "notconfigured") {
         state.view = "setup";
       } else {
@@ -439,6 +537,7 @@
     // Say so straight away if this build isn't linked to a server, rather than
     // showing a sign-in form that can't work.
     chrome.runtime.sendMessage({ type: "config" }, function (cfg) {
+      if (!chrome.runtime.lastError && cfg) state.config = cfg;
       if (!chrome.runtime.lastError && cfg && !cfg.configured) {
         state.view = "setup";
         render();

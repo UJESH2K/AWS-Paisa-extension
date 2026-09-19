@@ -47,7 +47,12 @@ def build_extension_copies():
         (dest / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
         if api_url:
             (dest / "config.js").write_text(
-                f'globalThis.PAISA_CONFIG = {{ apiUrl: "{api_url}" }};\n', encoding="utf-8"
+                "globalThis.PAISA_CONFIG = {\n"
+                f'  apiUrl: "{api_url}",\n'
+                '  region: "ap-south-1",\n'
+                '  roleTemplateUrl: "https://example-bucket.s3.amazonaws.com/role-template.yaml",\n'
+                "};\n",
+                encoding="utf-8",
             )
     return WORK / "ext-panel", WORK / "ext-noapi"
 
