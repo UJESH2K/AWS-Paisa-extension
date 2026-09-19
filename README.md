@@ -39,11 +39,15 @@ No AWS credentials ever live in the browser, the dashboard or the extension. The
 ## Status
 
 - [x] Conversion logic + tests (`backend/`)
-- [x] Dashboard and onboarding UI (`web/`), running on labelled sample data until the API is deployed
-- [ ] AWS backend (SAM) and Cost Explorer caching
-- [ ] Read-only role template
-- [x] Standalone extension (console badge + change tracking), works without the backend
-- [ ] Extension talking to the AWS API instead of reading the page
+- [x] Dashboard and onboarding UI (`web/`)
+- [x] AWS backend (SAM): email sign-in, cached spend, email summaries, scheduled digest
+- [x] Spend source fallback: CloudWatch billing metrics when Cost Explorer is unavailable
+- [x] Read-only role template (`onboarding/`)
+- [x] ₹ Bill button and panel on every AWS console page, themed to match the console
+- [x] Inline ₹ badges beside the console's own dollar figures
+- [ ] **Not yet deployed.** The target AWS account has not finished signup, so no
+      stack exists yet; `extension/config.js` has no API URL and the panel
+      offers a labelled sample instead of claiming to show real data.
 
 ## Run the dashboard
 
@@ -54,11 +58,22 @@ npm install
 npm run dev
 ```
 
-## Test the conversion maths
+## Tests
 
 ```
-python -m pytest backend/tests
+python -m pytest backend/tests     # 76 tests: conversion maths, auth, caching,
+                                   # spend sources, emails, API routes (moto, no AWS)
+python tests/e2e/run.py            # 4 browser suites driving the real extension
+cd web && npm run lint && npm run build
 ```
+
+The backend tests use `moto`, so they exercise the real DynamoDB/SNS/CloudWatch
+code paths without touching an AWS account: `pip install -r backend/requirements-dev.txt`.
+The browser suites need Node and Edge or Chrome; see `tests/e2e/README.md`.
+
+`python scripts/check_aws.py` reports whether this machine can deploy at all,
+telling apart missing credentials, an expired `aws login` session, an account
+that has not finished signup, and a ready account.
 
 `web/lib/convert.ts` is a TypeScript port of `backend/src/convert.py` so the dashboard can recompute instantly when settings change; the Python module is the source of truth.
 

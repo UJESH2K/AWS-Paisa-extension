@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+<body style="font-family:Arial;padding:30px;background:#f2f3f3">
+<h1>Cost Explorer</h1>
+<div style="background:#fff;padding:20px;margin:10px 0;width:420px">
+  <span>Total cost</span>
+  <div style="font-size:30px">USD 12.34</div>
+</div>
+<div id="host"></div>
+<p><span id="loose">250.00 USD</span></p>
+<iframe src="frame.html" style="width:420px;height:120px;border:1px solid #999"></iframe>
+<script>
+  const r = document.getElementById('host').attachShadow({ mode: 'open' });
+  r.innerHTML = '<div style="font-size:20px">Forecast <b>$99.00</b></div>';
+</script>
+</body>
+</html>

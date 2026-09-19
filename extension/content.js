@@ -21,6 +21,7 @@
     { re: /cost to date|current month|total (?:estimated )?(?:cost|charges|bill|amount)/i, name: "Total cost", score: 2 },
     { re: /forecast|estimated/i, name: "Forecast", score: 1 },
   ];
+  var BILLING_URL = /billing|cost|payment|invoice/i;
   var HISTORY_MAX = 50;
   var RECORD_EVERY_MS = 12 * 60 * 60 * 1000;
   var TOP = window === window.top;
@@ -310,10 +311,30 @@
     };
   }
 
+  // This script is allowed on every console page, so it has to decide for
+  // itself whether the page is about money. A billing-ish URL counts, and so
+  // does a figure sitting under a cost label (which is how sub-frames and
+  // widgets on other console paths qualify). Anything else is left untouched.
+  function billingContext(primary) {
+    return BILLING_URL.test(location.pathname + location.search + location.hash) ||
+      !!(primary && primary.label !== "Largest figure");
+  }
+
+  function clearBadges() {
+    badges.forEach(function (b) { b.remove(); });
+    badges.clear();
+  }
+
   var run = safe(function () {
     if (!document.body) return;
     var found = findAmounts();
     var primary = pickPrimary(found);
+    if (!billingContext(primary)) {
+      clearBadges();
+      last = { found: found.length, primary: null };
+      reportScan(found, null);
+      return;
+    }
     last = { found: found.length, primary: primary ? { label: primary.label, usd: primary.usd } : null };
     reportScan(found, primary);
     if (!fxRate()) return;

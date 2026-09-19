@@ -24,3 +24,6 @@ node_modules/
 Thumbs.db
 .vscode/
 .idea/
+
+# e2e scratch build
+tests/e2e/.work/
