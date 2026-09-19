@@ -1,0 +1,26 @@
+# Secrets — never commit
+.env
+.env.*
+*.pem
+*.key
+credentials
+.aws/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# AWS SAM
+.aws-sam/
+samconfig.toml.bak
+
+# Packaging / OS / editor
+*.zip
+node_modules/
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
