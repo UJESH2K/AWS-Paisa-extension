@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ApiError, getSpend, isApiConfigured, updateSettings } from "@/lib/api";
+import { ApiError, getSpend, isApiConfigured, signOutApi, updateSettings } from "@/lib/api";
 import { convert, effectiveRate } from "@/lib/convert";
 import { SAMPLE_SPEND } from "@/lib/demo";
 import { dateTimeIST, monthLabel } from "@/lib/format";
 import { clearSession, loadSession, loadSettings, saveSettings, type Session } from "@/lib/session";
 import { DEFAULT_SETTINGS, type Settings, type SpendResponse } from "@/lib/types";
 import BreakdownCard from "./BreakdownCard";
+import EmailCard from "./EmailCard";
 import FxCard from "./FxCard";
 import ProjectionCard from "./ProjectionCard";
 import ServicesCard from "./ServicesCard";
@@ -28,13 +29,13 @@ export default function Dashboard() {
   const hasSavedSettings = useRef(false);
   const syncTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const load = useCallback(async (s: Session | null) => {
+  const load = useCallback(async (s: Session | null, force = false) => {
     if (!isApiConfigured || !s) {
       setState({ status: "ready", spend: SAMPLE_SPEND, source: "sample" });
       return;
     }
     try {
-      const spend = await getSpend(s.token);
+      const spend = await getSpend(s.token, force);
       if (!hasSavedSettings.current) {
         setSettings({
           entity: spend.settings.entity,
@@ -73,13 +74,17 @@ export default function Dashboard() {
     if (isApiConfigured && session) {
       clearTimeout(syncTimer.current);
       // Best effort: keeps the server-side alert check on the same assumptions.
-      syncTimer.current = setTimeout(() => void updateSettings(session.token, next).catch(() => {}), 600);
+      syncTimer.current = setTimeout(
+        () =>
+          void updateSettings(session.token, { entity: next.entity, markup_pct: next.markupPct, gst_pct: next.gstPct }).catch(() => {}),
+        600,
+      );
     }
   };
 
   const refresh = async () => {
     setRefreshing(true);
-    await load(session);
+    await load(session, true);
     setRefreshing(false);
   };
 
@@ -129,6 +134,12 @@ export default function Dashboard() {
   }
 
   const { spend, source } = state;
+  const signOut = async () => {
+    if (session) await signOutApi(session.token).catch(() => {});
+    clearSession();
+    setSession(null);
+    await load(null);
+  };
   const rate = effectiveRate(spend.fx.rate, settings.entity, settings.markupPct, settings.gstPct);
 
   return (
@@ -171,13 +182,20 @@ export default function Dashboard() {
           <FxCard rate={spend.fx.rate} fetchedAt={spend.fx.fetchedAt} />
         </div>
         <ServicesCard services={spend.services} totalUsd={spend.usd} effectiveRate={rate} />
-        <SettingsCard settings={settings} onChange={onSettings} />
+        <div className="space-y-4">
+          <SettingsCard settings={settings} onChange={onSettings} />
+          {source === "live" && session && <EmailCard token={session.token} settings={spend.settings} />}
+        </div>
       </div>
 
-      {source === "live" && spend.cachedAt && (
+      {source === "live" && (
         <p className="text-xs text-faint">
-          Spend data cached from AWS Cost Explorer at {dateTimeIST(spend.cachedAt)}. Cost Explorer bills per
-          request, so Paisa serves a cached copy for a few hours.
+          {spend.cachedAt &&
+            `Spend data cached from AWS Cost Explorer at ${dateTimeIST(spend.cachedAt)}. Cost Explorer bills per request, so Paisa serves a cached copy for a few hours. `}
+          Gross usage before credits, tax excluded.{" "}
+          <button onClick={signOut} className="underline hover:text-muted">
+            Sign out{session ? ` (${session.email})` : ""}
+          </button>
         </p>
       )}
     </div>

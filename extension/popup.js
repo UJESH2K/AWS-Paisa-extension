@@ -101,7 +101,6 @@
     $("gst").value = (s.gstPct * 100).toFixed(0);
     $("gstOut").textContent = (s.gstPct * 100).toFixed(0) + "%";
     $("showAll").checked = !!s.showAll;
-    $("showHud").checked = s.showHud !== false;
     if (document.activeElement !== $("manualFx")) $("manualFx").value = s.manualFx || "";
     var fx = activeFx();
     $("fxRate").textContent = fx ? C.inr(fx.rate, 2) : "unavailable";
@@ -182,7 +181,6 @@
     $("markup").addEventListener("input", function () { saveSettings({ markupPct: Number($("markup").value) / 100 }); });
     $("gst").addEventListener("input", function () { saveSettings({ gstPct: Number($("gst").value) / 100 }); });
     $("showAll").addEventListener("change", function () { saveSettings({ showAll: $("showAll").checked }); });
-    $("showHud").addEventListener("change", function () { saveSettings({ showHud: $("showHud").checked }); });
     $("manualFx").addEventListener("input", function () {
       var v = parseFloat($("manualFx").value);
       saveSettings({ manualFx: isFinite(v) && v > 0 ? v : null });

@@ -1,6 +1,6 @@
 // Client for the Paisa AWS API (API Gateway + Lambda). No AWS credentials ever
-// touch this app: it holds only our own per-user token.
-import type { RegisterResponse, Settings, SpendResponse } from "./types";
+// touch this app: it holds only Paisa's own session token.
+import type { Me, ServerSettings, SpendResponse } from "./types";
 
 const BASE = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
@@ -44,18 +44,28 @@ async function call<T>(path: string, init: RequestInit & { token?: string } = {}
   return (await res.json()) as T;
 }
 
-/** Creates a user and returns the token + the ExternalId for the role's trust policy. */
-export const register = () => call<RegisterResponse>("/register", { method: "POST" });
+const json = (body: unknown) => JSON.stringify(body);
 
-/** Validates the role (test AssumeRole + 1-day Cost Explorer call) and stores it. */
-export const connectRole = (token: string, roleArn: string) =>
-  call<{ ok: true }>("/connect", { method: "POST", token, body: JSON.stringify({ roleArn }) });
+/** First call subscribes the address to AWS SNS (confirmation email); later calls send a sign-in code. */
+export const authStart = (email: string) =>
+  call<{ status: "confirm_subscription" | "code_sent" }>("/auth/start", { method: "POST", body: json({ email }) });
 
-export const getSpend = (token: string) => call<SpendResponse>("/spend", { token });
+export const authVerify = (email: string, code: string) =>
+  call<{ token: string; email: string }>("/auth/verify", { method: "POST", body: json({ email, code }) });
 
-export const updateSettings = (token: string, s: Settings) =>
-  call<{ ok: true }>("/settings", {
-    method: "PUT",
-    token,
-    body: JSON.stringify({ entity: s.entity, markup_pct: s.markupPct, gst_pct: s.gstPct }),
-  });
+export const signOutApi = (token: string) => call<{ ok: true }>("/auth/signout", { method: "POST", token });
+
+export const getMe = (token: string) => call<Me>("/me", { token });
+
+export const getSpend = (token: string, refresh = false) =>
+  call<SpendResponse>(`/spend${refresh ? "?refresh=1" : ""}`, { token });
+
+export const updateSettings = (token: string, patch: Partial<ServerSettings>) =>
+  call<{ ok: true; settings: ServerSettings }>("/settings", { method: "PUT", token, body: json(patch) });
+
+/** Validates a role in the user's own account (test AssumeRole + 1-day Cost Explorer call) and stores it. */
+export const connectRole = (token: string, roleArn: string | null) =>
+  call<{ ok: true; connected: boolean }>("/connect", { method: "POST", token, body: json({ roleArn }) });
+
+export const emailSummary = (token: string) =>
+  call<{ ok: true; sentTo: string }>("/email-summary", { method: "POST", token });

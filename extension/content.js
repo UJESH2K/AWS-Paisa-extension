@@ -2,8 +2,7 @@
 // amounts, puts an estimated rupee figure next to them, and records the headline
 // figure so the popup can show how the cost changes. The console DOM is not
 // ours and will change, so everything here fails silently rather than breaking
-// the page. A small corner card always says what Paisa found, so "nothing
-// happened" is never a mystery.
+// the page. The panel (panel.js) can copy a diagnostic report from here.
 (function () {
   "use strict";
   var C = globalThis.PaisaConvert;
@@ -30,7 +29,6 @@
   var badges = new Map(); // amount element -> badge element
   var timer = null;
   var popover = null;
-  var hud = null;
   var lastScanKey = "";
   var lastScanAt = 0;
   var last = { found: 0, primary: null };
@@ -78,7 +76,7 @@
     var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     while (w.nextNode()) out.push(w.currentNode);
     var els = root.querySelectorAll ? root.querySelectorAll("*") : [];
-    for (var i = 0; i < els.length; i++) if (els[i].shadowRoot) textNodes(els[i].shadowRoot, out);
+    for (var i = 0; i < els.length; i++) if (els[i].shadowRoot && !els[i].hasAttribute("data-paisa")) textNodes(els[i].shadowRoot, out);
     return out;
   }
 
@@ -284,15 +282,7 @@
     chrome.storage.local.set({ scan: info });
   });
 
-  // ---- corner card -------------------------------------------------------
-  function hudDismissed() {
-    try {
-      return window.sessionStorage.getItem("paisa.hud.off") === "1";
-    } catch (e) {
-      return false;
-    }
-  }
-
+  // ---- diagnostics ---------------------------------------------------------
   function buildReport() {
     var nodes = textNodes(document.body, []);
     var snippets = [];
@@ -320,102 +310,12 @@
     };
   }
 
-  function copyReport(btn) {
-    var text = JSON.stringify(buildReport(), null, 2);
-    var done = function () {
-      btn.textContent = "Copied";
-      setTimeout(function () {
-        btn.textContent = "Copy report";
-      }, 1500);
-    };
-    var fallback = function () {
-      var ta = document.createElement("textarea");
-      ta.value = text;
-      ta.setAttribute("data-paisa", "tmp");
-      ta.style.cssText = "position:fixed;left:-9999px";
-      document.body.appendChild(ta);
-      ta.select();
-      try {
-        document.execCommand("copy");
-        done();
-      } catch (e) {
-        /* ignore */
-      }
-      ta.remove();
-    };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
-    else fallback();
-  }
-
-  function ensureHud() {
-    if (hud && hud.isConnected) return hud;
-    hud = el("div", "paisa-hud");
-    hud.setAttribute("data-paisa", "hud");
-    var head = el("div", "paisa-hud-head");
-    head.appendChild(el("span", "paisa-hud-logo", "₹"));
-    head.appendChild(el("span", "paisa-hud-title", "Paisa"));
-    var x = el("button", "paisa-hud-x", "×");
-    x.type = "button";
-    x.title = "Hide for this tab";
-    x.setAttribute("aria-label", "Hide Paisa card");
-    x.addEventListener("click", function () {
-      try {
-        window.sessionStorage.setItem("paisa.hud.off", "1");
-      } catch (e) {
-        /* ignore */
-      }
-      hud.remove();
-      hud = null;
-    });
-    head.appendChild(x);
-    hud.appendChild(head);
-    hud.appendChild(el("div", "paisa-hud-main"));
-    hud.appendChild(el("div", "paisa-hud-sub"));
-    var cp = el("button", "paisa-hud-copy", "Copy report");
-    cp.type = "button";
-    cp.addEventListener("click", function () {
-      copyReport(cp);
-    });
-    hud.appendChild(cp);
-    document.body.appendChild(hud);
-    return hud;
-  }
-
-  function renderHud(found, primary) {
-    if (!TOP) return;
-    if (state.settings.showHud === false || hudDismissed()) {
-      if (hud) {
-        hud.remove();
-        hud = null;
-      }
-      return;
-    }
-    var h = ensureHud();
-    var main = h.querySelector(".paisa-hud-main");
-    var sub = h.querySelector(".paisa-hud-sub");
-    var c = primary ? calc(primary.usd) : null;
-    var m, s;
-    if (!fxRate()) {
-      m = "Waiting for the exchange rate…";
-      s = "Fetching USD to INR. Reload if this stays.";
-    } else if (primary && c) {
-      m = "≈ " + C.inr(c.r.total);
-      s = primary.label + " " + C.usd(primary.usd) + " · " + found.length + " $ figure" + (found.length === 1 ? "" : "s") + " on this page";
-    } else {
-      m = "No $ figure found yet";
-      s = "Paisa is running, but this view has no dollar amount. Open the Billing home or Cost Explorer.";
-    }
-    if (main.textContent !== m) main.textContent = m;
-    if (sub.textContent !== s) sub.textContent = s;
-  }
-
   var run = safe(function () {
     if (!document.body) return;
     var found = findAmounts();
     var primary = pickPrimary(found);
     last = { found: found.length, primary: primary ? { label: primary.label, usd: primary.usd } : null };
     reportScan(found, primary);
-    renderHud(found, primary);
     if (!fxRate()) return;
     var live = new Set(found.map(function (f) { return f.el; }));
     badges.forEach(function (b, elm) {
@@ -496,6 +396,8 @@
       if (ev.key === "Escape") closePopover();
     });
   }
+
+  globalThis.PaisaScan = { report: buildReport }; // used by the panel's "Copy page report"
 
   function boot() {
     try {

@@ -8,7 +8,6 @@
     markupPct: 0.035, // card forex markup, fraction
     gstPct: 0.18, // fraction
     showAll: true, // put a small rupee figure next to every $ amount
-    showHud: true, // small status card in the corner of AWS pages
     manualFx: null, // optional user-entered USD->INR rate overriding the fetched one
   };
 

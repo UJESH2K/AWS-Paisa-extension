@@ -1,4 +1,4 @@
-// Browser-side persistence. The token is our own per-user API token (never an
+// Browser-side persistence. The token is Paisa's own session token (never an
 // AWS credential). Every access is wrapped: storage can be blocked or empty.
 import { DEFAULT_SETTINGS, type Settings } from "./types";
 
@@ -7,8 +7,7 @@ const SETTINGS_KEY = "paisa.settings";
 
 export interface Session {
   token: string;
-  externalId: string;
-  roleArn?: string;
+  email: string;
 }
 
 function read<T>(key: string): T | null {
