@@ -60,7 +60,9 @@ def build_summary(raw, fx, settings, days_elapsed, month_days, month, as_of):
         "otherInr": other * per_usd,
         "cachedAt": raw.get("cachedAt"),
         "source": raw.get("source", "self"),
-        "excludes": ["Credit", "Refund", "Tax"],
+        "provider": raw.get("provider", "cost_explorer"),
+        "providerNote": raw.get("note", ""),
+        "excludes": ["Credit", "Refund", "Tax"] if raw.get("provider", "cost_explorer") == "cost_explorer" else [],
     }
 
 
@@ -119,7 +121,7 @@ def email_text(summary, kind="projection"):
             lines.append(f"  {'Everything else':<38} {fmt_inr(s['otherInr'], 0):>14}   (${s['otherUsd']:.2f})")
         lines.append("")
     lines += [
-        "This is an estimate. Spend is gross usage before credits and excludes tax lines.",
+        "This is an estimate. " + (s.get("providerNote") or ""),
         f"Exchange rate: mid-market from {s['fx']['source'] or 'a public source'}; your bank's rate on the",
         "settlement date, your card's markup and your AWS entity decide the real figure.",
         "",

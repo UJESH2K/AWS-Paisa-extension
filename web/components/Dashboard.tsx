@@ -191,8 +191,10 @@ export default function Dashboard() {
       {source === "live" && (
         <p className="text-xs text-faint">
           {spend.cachedAt &&
-            `Spend data cached from AWS Cost Explorer at ${dateTimeIST(spend.cachedAt)}. Cost Explorer bills per request, so Paisa serves a cached copy for a few hours. `}
-          Gross usage before credits, tax excluded.{" "}
+            `Spend data read at ${dateTimeIST(spend.cachedAt)} and cached for a few hours${
+              spend.provider === "cloudwatch" ? "" : ", because Cost Explorer bills per request"
+            }. `}
+          {spend.providerNote || "Gross usage before credits, tax excluded."}{" "}
           <button onClick={signOut} className="underline hover:text-muted">
             Sign out{session ? ` (${session.email})` : ""}
           </button>

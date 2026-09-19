@@ -143,7 +143,9 @@ def test_fetch_period_paginates_sorts_and_filters(monkeypatch):
 
     monkeypatch.setattr(ce, "_client", lambda creds=None: FakeCE())
     out = ce.fetch_period(date(2026, 9, 1), date(2026, 9, 21))
-    assert out == {"usd": 12.25, "services": [{"name": "Amazon EC2", "usd": 10.25}, {"name": "Amazon S3", "usd": 2.0}]}
+    assert out["usd"] == 12.25
+    assert out["services"] == [{"name": "Amazon EC2", "usd": 10.25}, {"name": "Amazon S3", "usd": 2.0}]
+    assert out["provider"] == "cost_explorer"
     assert seen[1]["NextPageToken"] == "next"
     assert seen[0]["TimePeriod"] == {"Start": "2026-09-01", "End": "2026-09-21"}
     excluded = seen[0]["Filter"]["Not"]["Dimensions"]["Values"]

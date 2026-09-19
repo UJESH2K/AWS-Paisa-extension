@@ -41,6 +41,10 @@ Resources:
                   - ce:GetCostAndUsage
                   - ce:GetCostForecast
                   - ce:GetDimensionValues
+                  # Fallback for accounts without Cost Explorer: the free
+                  # AWS/Billing EstimatedCharges metric.
+                  - cloudwatch:GetMetricStatistics
+                  - cloudwatch:ListMetrics
                 Resource: "*"
 
 Outputs:

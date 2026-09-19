@@ -38,6 +38,10 @@ export interface SpendResponse {
   settings: ServerSettings;
   cachedAt?: string | null; // when Cost Explorer was last actually queried
   source?: string;
+  /** Which spend source answered: "cost_explorer" or "cloudwatch". */
+  provider?: "cost_explorer" | "cloudwatch";
+  /** One sentence naming that source and its limits, shown in the UI. */
+  providerNote?: string;
   excludes?: string[];
 }
 

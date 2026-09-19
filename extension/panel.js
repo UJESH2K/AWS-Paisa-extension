@@ -128,6 +128,7 @@
       settings: s, breakdown: { base: r.base, markup: r.markup, gst: r.gst, total: r.total }, projection: r.projection,
       services: svc.map(function (x) { return { name: x[0], usd: x[1], inr: x[1] * per }; }),
       otherUsd: 3.38, otherInr: 3.38 * per,
+      providerNote: "Illustrative figures, not read from any AWS account.",
     };
   }
 
@@ -312,7 +313,9 @@
       foot.push(h("span", { text: state.session.email }), h("button", { class: "link", onclick: signOut, text: "Sign out" }));
     }
     if (globalThis.PaisaScan) foot.push(h("button", { class: "link", onclick: copyReport, text: "Copy page report" }));
-    out.push(h("div", { class: "foot" }, foot), h("p", { class: "note", style: "margin-top:10px", text: "Estimates only. Your bank's rate on the settlement date and your AWS entity decide the real figure." }));
+    out.push(h("div", { class: "foot" }, foot));
+    if (s.providerNote) out.push(h("p", { class: "note", style: "margin-top:10px", text: s.providerNote }));
+    out.push(h("p", { class: "note", style: "margin-top:6px", text: "Estimates only. Your bank's rate on the settlement date and your AWS entity decide the real figure." }));
     return out;
   }
 

@@ -59,7 +59,9 @@ Resources:
               Resource: !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:paisa-*
             - Sid: ReadCosts
               Effect: Allow
-              Action: [ce:GetCostAndUsage]
+              # cloudwatch:* here is only the AWS/Billing namespace in practice;
+              # these two actions do not support resource-level permissions.
+              Action: [ce:GetCostAndUsage, cloudwatch:GetMetricStatistics, cloudwatch:ListMetrics]
               Resource: "*"
             - Sid: AssumeUserRoles
               Effect: Allow

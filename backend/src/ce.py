@@ -8,6 +8,18 @@ from botocore.exceptions import ClientError
 
 from common import HttpError
 
+PROVIDER = "cost_explorer"
+NOTE = "From AWS Cost Explorer: gross usage this month, before credits and excluding tax lines."
+
+
+class Unavailable(HttpError):
+    """Cost Explorer cannot be used for this account at all (not enabled, or no access).
+
+    Distinct from a transient failure: the caller should fall back to another
+    spend source rather than retry.
+    """
+
+
 # Gross usage: leave out credits, refunds and tax so the figure is what the
 # console's "before credits" number shows and our own GST maths doesn't double count.
 EXCLUDED_RECORD_TYPES = ["Credit", "Refund", "Tax"]
@@ -70,11 +82,18 @@ def fetch_period(start, end, creds=None):
             kwargs["NextPageToken"] = token
     except ClientError as e:
         code = e.response.get("Error", {}).get("Code", "")
-        if code in ("AccessDeniedException", "AccessDenied", "OptInRequiredException"):
-            raise HttpError(
+        if code in (
+            "AccessDeniedException",
+            "AccessDenied",
+            "OptInRequiredException",
+            "OptInRequired",
+            "SubscriptionRequiredException",
+        ):
+            raise Unavailable(
                 502,
-                "Cost Explorer isn't accessible yet. In the AWS console enable Cost Explorer and "
-                "'IAM user and role access to Billing information', then try again.",
+                "Cost Explorer isn't enabled for this account. Enable it in the AWS console "
+                "(Billing and Cost Management > Cost Explorer), or turn on billing alerts so Paisa "
+                "can read CloudWatch billing metrics instead.",
             ) from e
         if code == "DataUnavailableException":
             raise HttpError(502, "Cost Explorer is still preparing your data (it can take up to 24 hours after enabling).") from e
@@ -84,4 +103,9 @@ def fetch_period(start, end, creds=None):
         key=lambda s: s["usd"],
         reverse=True,
     )
-    return {"usd": round(sum(s["usd"] for s in services), 6), "services": services}
+    return {
+        "usd": round(sum(s["usd"] for s in services), 6),
+        "services": services,
+        "provider": PROVIDER,
+        "note": NOTE,
+    }

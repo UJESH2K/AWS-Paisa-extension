@@ -1,12 +1,20 @@
-"""Spend: cache first, then Cost Explorer. Cost Explorer bills per request, so
-this cache is a cost decision, not a performance one: nothing calls ce.py
+"""Spend: cache first, then a spend source. Cost Explorer bills per request, so
+this cache is a cost decision, not a performance one: nothing calls a provider
 without going through get_raw_month_to_date().
+
+Two sources, in order of quality:
+  1. Cost Explorer  - per-day granularity, gross usage, billed per request;
+  2. CloudWatch AWS/Billing EstimatedCharges - free, coarse, needs billing
+     alerts on. Used only when Cost Explorer is unavailable for the account.
+Whichever answered is reported back to the UI, so a figure never pretends to be
+more precise than its source.
 """
 import json
 import os
 from datetime import datetime, timedelta, timezone
 
 import ce
+import cw
 import report
 from common import HttpError, cache_table, dumps, user_settings
 from fx_refresher import get_fx, refresh
@@ -43,7 +51,15 @@ def get_raw_month_to_date(user, now, force=False):
         if age < SPEND_TTL and not (force and age >= MIN_REFRESH):
             return json.loads(item["json"])
     start, end = ce.month_to_date_window(today)
-    raw = ce.fetch_period(start, end, _creds_for(user, mode, role_arn))
+    creds = _creds_for(user, mode, role_arn)
+    try:
+        raw = ce.fetch_period(start, end, creds)
+    except ce.Unavailable as unavailable:
+        try:
+            raw = cw.fetch_month_to_date(now, creds)
+        except HttpError as fallback_failed:
+            # Report the primary reason; the fallback is an implementation detail.
+            raise (fallback_failed if fallback_failed.status != 502 else unavailable) from unavailable
     raw["cachedAt"] = now.isoformat(timespec="seconds")
     raw["source"] = mode
     table.put_item(
@@ -83,6 +99,8 @@ def get_previous_month(user, now):
     """Final figures for last month (used by the monthly digest). Not cached: runs once a month."""
     mode, role_arn = data_source(user)
     start, end = report.previous_month_window(now.date())
+    # No CloudWatch fallback here: EstimatedCharges only covers the current
+    # month, so last month's final figure needs Cost Explorer.
     raw = ce.fetch_period(start, end, _creds_for(user, mode, role_arn))
     raw["source"] = mode
     days = (end - start).days

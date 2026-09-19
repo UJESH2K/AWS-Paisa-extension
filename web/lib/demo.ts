@@ -22,4 +22,5 @@ export const SAMPLE_SPEND: SpendResponse = {
   daysElapsed: 18,
   daysInMonth: 30,
   settings: { entity: "AWS_INC", markup_pct: 0.035, gst_pct: 0.18, digest: "monthly", threshold_inr: null },
+  providerNote: "Illustrative figures, not read from any AWS account.",
 };
