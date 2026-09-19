@@ -1,14 +1,22 @@
-// Runs on AWS Billing / Cost Management pages. Finds dollar amounts, puts an
-// estimated rupee figure next to them, and records the headline figure so the
-// popup can show how the cost changes. The console DOM is not ours and will
-// change, so everything here fails silently rather than breaking the page.
+// Runs on AWS Billing / Cost Management pages (including iframes). Finds dollar
+// amounts, puts an estimated rupee figure next to them, and records the headline
+// figure so the popup can show how the cost changes. The console DOM is not
+// ours and will change, so everything here fails silently rather than breaking
+// the page. A small corner card always says what Paisa found, so "nothing
+// happened" is never a mystery.
 (function () {
   "use strict";
   var C = globalThis.PaisaConvert;
   if (!C || window.__paisaLoaded) return;
   window.__paisaLoaded = true;
 
-  var AMOUNT = /^\s*(?:US\s?)?\$\s?(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?\s*$/;
+  var NUM = "(\\d{1,3}(?:,\\d{3})+|\\d+)(\\.\\d+)?";
+  var AMOUNTS = [
+    new RegExp("^\\s*(?:US\\s?)?\\$\\s?" + NUM + "\\s*$"), // $12.34, US$12
+    new RegExp("^\\s*USD\\s?" + NUM + "\\s*$", "i"), // USD 12.34
+    new RegExp("^\\s*" + NUM + "\\s?USD\\s*$", "i"), // 12.34 USD
+  ];
+  var HAS_CURRENCY = /\$|USD/i;
   var LABELS = [
     { re: /month[-\s]to[-\s]date/i, name: "Month-to-date", score: 3 },
     { re: /cost to date|current month|total (?:estimated )?(?:cost|charges|bill|amount)/i, name: "Total cost", score: 2 },
@@ -16,11 +24,16 @@
   ];
   var HISTORY_MAX = 50;
   var RECORD_EVERY_MS = 12 * 60 * 60 * 1000;
+  var TOP = window === window.top;
 
   var state = { settings: C.DEFAULT_SETTINGS, fx: null };
   var badges = new Map(); // amount element -> badge element
   var timer = null;
   var popover = null;
+  var hud = null;
+  var lastScanKey = "";
+  var lastScanAt = 0;
+  var last = { found: 0, primary: null };
 
   function safe(fn) {
     return function () {
@@ -49,21 +62,33 @@
   }
 
   function parseAmount(text) {
-    var m = AMOUNT.exec(text);
-    return m ? parseFloat(m[1].replace(/,/g, "") + (m[2] || "")) : null;
+    for (var i = 0; i < AMOUNTS.length; i++) {
+      var m = AMOUNTS[i].exec(text);
+      if (m) return parseFloat(m[1].replace(/,/g, "") + (m[2] || ""));
+    }
+    return null;
   }
 
   function visible(el) {
     return el.getClientRects().length > 0;
   }
 
+  // All text nodes, including inside open shadow roots.
+  function textNodes(root, out) {
+    var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    while (w.nextNode()) out.push(w.currentNode);
+    var els = root.querySelectorAll ? root.querySelectorAll("*") : [];
+    for (var i = 0; i < els.length; i++) if (els[i].shadowRoot) textNodes(els[i].shadowRoot, out);
+    return out;
+  }
+
   function findAmounts() {
     var found = [];
     var seen = new Set();
-    var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    while (w.nextNode()) {
-      var tn = w.currentNode;
-      if (tn.nodeValue.indexOf("$") === -1 || ours(tn)) continue;
+    var nodes = textNodes(document.body, []);
+    for (var n = 0; n < nodes.length; n++) {
+      var tn = nodes[n];
+      if (!HAS_CURRENCY.test(tn.nodeValue) || ours(tn)) continue;
       // Climb to the outermost element that still reads as one amount, so
       // "<span>$</span><span>47.30</span>" is treated as a single figure.
       var e = tn.parentElement;
@@ -138,15 +163,17 @@
     }
   }
 
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+
   function row(label, value, strong) {
-    var r = document.createElement("div");
-    r.className = "paisa-row" + (strong ? " paisa-strong" : "");
-    var a = document.createElement("span");
-    a.textContent = label;
-    var b = document.createElement("span");
-    b.textContent = value;
-    r.appendChild(a);
-    r.appendChild(b);
+    var r = el("div", "paisa-row" + (strong ? " paisa-strong" : ""));
+    r.appendChild(el("span", "", label));
+    r.appendChild(el("span", "", value));
     return r;
   }
 
@@ -155,22 +182,20 @@
     var c = calc(usd);
     if (!c) return;
     var s = state.settings;
-    var p = document.createElement("div");
+    var p = el("div", "paisa-pop");
     p.setAttribute("data-paisa", "pop");
-    p.className = "paisa-pop";
-    var h = document.createElement("div");
-    h.className = "paisa-pop-title";
-    h.textContent = "Paisa · estimate";
-    p.appendChild(h);
+    p.appendChild(el("div", "paisa-pop-title", "Paisa · estimate"));
     p.appendChild(row(C.usd(usd) + " × " + C.inr(c.fx.rate, 2), C.inr(c.r.base, 2)));
     p.appendChild(row(s.entity === "AWS_INC" ? "Card markup " + C.pct(s.markupPct) : "Card markup (AISPL: none)", C.inr(c.r.markup, 2)));
     p.appendChild(row("GST " + C.pct(s.gstPct), C.inr(c.r.gst, 2)));
     p.appendChild(row("Total", C.inr(c.r.total, 2), true));
-    var f = document.createElement("div");
-    f.className = "paisa-pop-foot";
-    f.textContent =
-      "Rate from " + c.fx.source + (c.fx.asOf ? " (" + String(c.fx.asOf).slice(0, 10) + ")" : "") + ". Open the Paisa popup for changes and settings.";
-    p.appendChild(f);
+    p.appendChild(
+      el(
+        "div",
+        "paisa-pop-foot",
+        "Rate from " + c.fx.source + (c.fx.asOf ? " (" + String(c.fx.asOf).slice(0, 10) + ")" : "") + ". Open the Paisa popup for changes and settings.",
+      ),
+    );
     document.body.appendChild(p);
     var rect = anchor.getBoundingClientRect();
     var left = Math.min(Math.max(8, rect.left), window.innerWidth - p.offsetWidth - 8);
@@ -181,21 +206,19 @@
     popover = p;
   }
 
-  function upsertBadge(el, usd, primary) {
+  function upsertBadge(elm, usd, primary) {
     var c = calc(usd);
     if (!c) return;
     var text = "≈ " + C.inr(c.r.total);
-    var b = badges.get(el);
+    var b = badges.get(elm);
     if (b && b.isConnected && (b.getAttribute("data-paisa") === "primary") === primary) {
       if (b.textContent !== text) b.textContent = text;
       b.__usd = usd;
       return;
     }
     if (b) b.remove();
-    b = document.createElement("span");
+    b = el("span", primary ? "paisa-badge" : "paisa-inline", text);
     b.setAttribute("data-paisa", primary ? "primary" : "inline");
-    b.className = primary ? "paisa-badge" : "paisa-inline";
-    b.textContent = text;
     b.__usd = usd;
     if (primary) {
       b.setAttribute("role", "button");
@@ -214,9 +237,9 @@
     }
     // Inline elements get the badge as a sibling. Block-level containers (and
     // table cells) get it appended inside, so it sits on the figure's own line.
-    if (getComputedStyle(el).display.indexOf("inline") === 0) el.insertAdjacentElement("afterend", b);
-    else el.appendChild(b);
-    badges.set(el, b);
+    if (getComputedStyle(elm).display.indexOf("inline") === 0) elm.insertAdjacentElement("afterend", b);
+    else elm.appendChild(b);
+    badges.set(elm, b);
   }
 
   var record = safe(function (p) {
@@ -224,17 +247,17 @@
     if (!fx) return;
     chrome.storage.local.get({ history: [] }, function (d) {
       var h = d.history || [];
-      var last = null;
+      var prev = null;
       for (var i = h.length - 1; i >= 0; i--) {
         if (h[i].src === "page" && h[i].label === p.label) {
-          last = h[i];
+          prev = h[i];
           break;
         }
       }
       var now = Date.now();
-      if (last && Math.abs(last.usd - p.usd) < 0.005 && now - last.t < RECORD_EVERY_MS) {
-        if (now - (last.seenAt || last.t) > 60000) {
-          last.seenAt = now;
+      if (prev && Math.abs(prev.usd - p.usd) < 0.005 && now - prev.t < RECORD_EVERY_MS) {
+        if (now - (prev.seenAt || prev.t) > 60000) {
+          prev.seenAt = now;
           chrome.storage.local.set({ history: h });
         }
         return;
@@ -244,15 +267,161 @@
     });
   });
 
+  // Tells the popup whether Paisa ran on an AWS page and what it found.
+  var reportScan = safe(function (found, primary) {
+    if (!TOP && found.length === 0) return;
+    var info = {
+      at: Date.now(),
+      url: location.origin + location.pathname,
+      frame: TOP ? "top" : "iframe",
+      count: found.length,
+      primary: primary ? { label: primary.label, usd: primary.usd } : null,
+    };
+    var key = JSON.stringify([info.url, info.frame, info.count, info.primary]);
+    if (key === lastScanKey && Date.now() - lastScanAt < 30000) return;
+    lastScanKey = key;
+    lastScanAt = Date.now();
+    chrome.storage.local.set({ scan: info });
+  });
+
+  // ---- corner card -------------------------------------------------------
+  function hudDismissed() {
+    try {
+      return window.sessionStorage.getItem("paisa.hud.off") === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function buildReport() {
+    var nodes = textNodes(document.body, []);
+    var snippets = [];
+    for (var i = 0; i < nodes.length && snippets.length < 30; i++) {
+      var tn = nodes[i];
+      if (!HAS_CURRENCY.test(tn.nodeValue) || ours(tn)) continue;
+      var p = tn.parentElement;
+      snippets.push({
+        text: tn.nodeValue.trim().slice(0, 60),
+        tag: p ? p.tagName : null,
+        cls: p ? String(p.className || "").slice(0, 60) : null,
+        parentText: p && p.parentElement ? p.parentElement.textContent.trim().slice(0, 80) : null,
+        matched: parseAmount(tn.nodeValue.trim()) !== null,
+      });
+    }
+    return {
+      paisa: "0.1.1",
+      page: location.origin + location.pathname,
+      title: document.title,
+      frame: TOP ? "top" : "iframe",
+      hasFx: !!fxRate(),
+      amountsFound: last.found,
+      headline: last.primary,
+      currencyTextNodes: snippets,
+    };
+  }
+
+  function copyReport(btn) {
+    var text = JSON.stringify(buildReport(), null, 2);
+    var done = function () {
+      btn.textContent = "Copied";
+      setTimeout(function () {
+        btn.textContent = "Copy report";
+      }, 1500);
+    };
+    var fallback = function () {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("data-paisa", "tmp");
+      ta.style.cssText = "position:fixed;left:-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+        done();
+      } catch (e) {
+        /* ignore */
+      }
+      ta.remove();
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+    else fallback();
+  }
+
+  function ensureHud() {
+    if (hud && hud.isConnected) return hud;
+    hud = el("div", "paisa-hud");
+    hud.setAttribute("data-paisa", "hud");
+    var head = el("div", "paisa-hud-head");
+    head.appendChild(el("span", "paisa-hud-logo", "₹"));
+    head.appendChild(el("span", "paisa-hud-title", "Paisa"));
+    var x = el("button", "paisa-hud-x", "×");
+    x.type = "button";
+    x.title = "Hide for this tab";
+    x.setAttribute("aria-label", "Hide Paisa card");
+    x.addEventListener("click", function () {
+      try {
+        window.sessionStorage.setItem("paisa.hud.off", "1");
+      } catch (e) {
+        /* ignore */
+      }
+      hud.remove();
+      hud = null;
+    });
+    head.appendChild(x);
+    hud.appendChild(head);
+    hud.appendChild(el("div", "paisa-hud-main"));
+    hud.appendChild(el("div", "paisa-hud-sub"));
+    var cp = el("button", "paisa-hud-copy", "Copy report");
+    cp.type = "button";
+    cp.addEventListener("click", function () {
+      copyReport(cp);
+    });
+    hud.appendChild(cp);
+    document.body.appendChild(hud);
+    return hud;
+  }
+
+  function renderHud(found, primary) {
+    if (!TOP) return;
+    if (state.settings.showHud === false || hudDismissed()) {
+      if (hud) {
+        hud.remove();
+        hud = null;
+      }
+      return;
+    }
+    var h = ensureHud();
+    var main = h.querySelector(".paisa-hud-main");
+    var sub = h.querySelector(".paisa-hud-sub");
+    var c = primary ? calc(primary.usd) : null;
+    var m, s;
+    if (!fxRate()) {
+      m = "Waiting for the exchange rate…";
+      s = "Fetching USD to INR. Reload if this stays.";
+    } else if (primary && c) {
+      m = "≈ " + C.inr(c.r.total);
+      s = primary.label + " " + C.usd(primary.usd) + " · " + found.length + " $ figure" + (found.length === 1 ? "" : "s") + " on this page";
+    } else {
+      m = "No $ figure found yet";
+      s = "Paisa is running, but this view has no dollar amount. Open the Billing home or Cost Explorer.";
+    }
+    if (main.textContent !== m) main.textContent = m;
+    if (sub.textContent !== s) sub.textContent = s;
+  }
+
   var run = safe(function () {
-    if (!document.body || !state.fx && !(state.settings.manualFx > 0)) return;
+    if (!document.body) return;
     var found = findAmounts();
     var primary = pickPrimary(found);
+    last = { found: found.length, primary: primary ? { label: primary.label, usd: primary.usd } : null };
+    reportScan(found, primary);
+    renderHud(found, primary);
+    if (!fxRate()) return;
     var live = new Set(found.map(function (f) { return f.el; }));
-    badges.forEach(function (b, el) {
-      if (!live.has(el) || !el.isConnected) {
+    badges.forEach(function (b, elm) {
+      if (!live.has(elm) || !elm.isConnected) {
         b.remove();
-        badges.delete(el);
+        badges.delete(elm);
       }
     });
     found.forEach(function (f) {
@@ -304,6 +473,14 @@
       }
     }).observe(document.body, { childList: true, subtree: true, characterData: true });
 
+    // The console is a single-page app that renders late and navigates without
+    // reloading: re-scan on route changes and on a slow timer as a safety net.
+    window.addEventListener("hashchange", schedule);
+    window.addEventListener("popstate", schedule);
+    setInterval(function () {
+      if (document.visibilityState === "visible") schedule();
+    }, 4000);
+
     chrome.storage.onChanged.addListener(function (changes, area) {
       if (area !== "local" || !(changes.settings || changes.fx)) return;
       loadState(function () {
@@ -320,9 +497,14 @@
     });
   }
 
-  try {
-    start();
-  } catch (e) {
-    /* fail silently */
+  function boot() {
+    try {
+      start();
+    } catch (e) {
+      /* fail silently */
+    }
   }
+
+  if (document.body) boot();
+  else document.addEventListener("DOMContentLoaded", boot);
 })();

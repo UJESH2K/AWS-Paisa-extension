@@ -52,6 +52,9 @@ h2 { margin-bottom: 8px; color: var(--muted); font-size: 10.5px; font-weight: 60
 .note { color: var(--faint); font-size: 11.5px; line-height: 1.5; }
 .note strong { color: var(--muted); font-weight: 600; }
 .muted { color: var(--muted); }
+.scan { margin: -4px 2px 12px; color: var(--faint); font-size: 11.5px; line-height: 1.5; }
+.scan.ok { color: var(--muted); }
+.scan.warn { color: var(--warn); }
 
 .change { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .change .delta { font-size: 15px; font-weight: 650; }

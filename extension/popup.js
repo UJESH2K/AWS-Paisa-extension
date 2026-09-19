@@ -101,6 +101,7 @@
     $("gst").value = (s.gstPct * 100).toFixed(0);
     $("gstOut").textContent = (s.gstPct * 100).toFixed(0) + "%";
     $("showAll").checked = !!s.showAll;
+    $("showHud").checked = s.showHud !== false;
     if (document.activeElement !== $("manualFx")) $("manualFx").value = s.manualFx || "";
     var fx = activeFx();
     $("fxRate").textContent = fx ? C.inr(fx.rate, 2) : "unavailable";
@@ -145,7 +146,23 @@
     });
   }
 
+  function renderScan() {
+    var p = $("scanLine");
+    var sc = st.scan;
+    if (!sc) {
+      p.className = "scan warn";
+      p.textContent = "Paisa hasn't run on an AWS page yet. Open your AWS Billing page and reload it (Ctrl+R) now that Paisa is installed.";
+      return;
+    }
+    var path = sc.url.replace(/^https?:\/\//, "");
+    p.className = "scan ok";
+    p.textContent =
+      "Last page scan " + when(sc.at) + " · " + path + " · " + sc.count + " $ figure" + (sc.count === 1 ? "" : "s") +
+      (sc.primary ? " · headline " + C.usd(sc.primary.usd) + " (" + sc.primary.label + ")" : " · no headline figure on that view");
+  }
+
   function render() {
+    renderScan();
     renderHero();
     renderSettings();
     renderCalc();
@@ -165,6 +182,7 @@
     $("markup").addEventListener("input", function () { saveSettings({ markupPct: Number($("markup").value) / 100 }); });
     $("gst").addEventListener("input", function () { saveSettings({ gstPct: Number($("gst").value) / 100 }); });
     $("showAll").addEventListener("change", function () { saveSettings({ showAll: $("showAll").checked }); });
+    $("showHud").addEventListener("change", function () { saveSettings({ showHud: $("showHud").checked }); });
     $("manualFx").addEventListener("input", function () {
       var v = parseFloat($("manualFx").value);
       saveSettings({ manualFx: isFinite(v) && v > 0 ? v : null });
@@ -197,9 +215,10 @@
     });
   }
 
-  chrome.storage.local.get({ settings: null, fx: null, history: [] }, function (d) {
+  chrome.storage.local.get({ settings: null, fx: null, history: [], scan: null }, function (d) {
     st.settings = Object.assign({}, C.DEFAULT_SETTINGS, d.settings || {});
     st.fx = d.fx;
+    st.scan = d.scan;
     st.history = d.history || [];
     bind();
     render();

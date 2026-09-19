@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Paisa - AWS bill in rupees",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Shows your AWS bill in rupees after forex, card markup and GST, right next to the dollar figure, and tracks how it changes. Estimates only.",
   "permissions": ["storage"],
   "host_permissions": [
@@ -26,6 +26,7 @@
       ],
       "js": ["convert.js", "content.js"],
       "css": ["content.css"],
+      "all_frames": true,
       "run_at": "document_idle"
     }
   ],
