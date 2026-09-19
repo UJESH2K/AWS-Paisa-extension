@@ -1,0 +1,127 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Paisa backend. Shows an Indian AWS user their bill in rupees after forex, card
+  markup and GST. Everything is pay-per-use (on-demand DynamoDB, Lambda, HTTP API,
+  SNS email) so an idle stack costs nothing.
+
+Parameters:
+  OwnerEmails:
+    Type: String
+    Default: ""
+    Description: >
+      Comma-separated emails allowed to read THIS account's own costs (self mode).
+      Everyone else must connect their own read-only role.
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 60
+    MemorySize: 256
+    CodeUri: src/
+    Environment:
+      Variables:
+        USERS_TABLE: !Ref UsersTable
+        CACHE_TABLE: !Ref CacheTable
+        FX_TABLE: !Ref FxTable
+        OWNER_EMAILS: !Ref OwnerEmails
+
+Resources:
+  # ---- API: HTTP API (cheaper than REST and sufficient here). Throttled so a
+  # public URL can't be used to run up usage or spam confirmation emails. ----
+  PaisaApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: ["*"]
+        AllowHeaders: [authorization, content-type]
+        AllowMethods: [GET, POST, PUT, OPTIONS]
+        MaxAge: 3600
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 10
+        ThrottlingRateLimit: 5
+
+  # ---- One Lambda serves the API and the scheduled jobs. ----
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: paisa-api
+      Handler: api.handler
+      Description: Paisa HTTP API and scheduled FX refresh / email digest
+      Policies:
+        - DynamoDBCrudPolicy: { TableName: !Ref UsersTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref CacheTable }
+        - DynamoDBCrudPolicy: { TableName: !Ref FxTable }
+        - Statement:
+            - Sid: PerUserTopics
+              Effect: Allow
+              Action: [sns:CreateTopic, sns:Subscribe, sns:Publish, sns:ListSubscriptionsByTopic]
+              Resource: !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:paisa-*
+            - Sid: ReadCosts
+              Effect: Allow
+              Action: [ce:GetCostAndUsage]
+              Resource: "*"
+            - Sid: AssumeUserRoles
+              Effect: Allow
+              Action: [sts:AssumeRole]
+              Resource: arn:aws:iam::*:role/PaisaReadOnlyRole
+      Events:
+        Health: { Type: HttpApi, Properties: { ApiId: !Ref PaisaApi, Path: /health, Method: GET } }
+        AuthStart: { Type: HttpApi, Properties: { ApiId: !Ref PaisaApi, Path: /auth/start, Method: POST } }
+        AuthVerify: { Type: HttpApi, Properties: { ApiId: !Ref PaisaApi, Path: /auth/verify, Method: POST } }
+        AuthSignOut: { Type: HttpApi, Properties: { ApiId: !Ref PaisaApi, Path: /auth/signout, Method: POST } }
+        Me: { Type: HttpApi, Properties: { ApiId: !Ref PaisaApi, Path: /me, Method: GET } }
+        Spend: { Type: HttpApi, Properties: { ApiId: !Ref PaisaApi, Path: /spend, Method: GET } }
+        Settings: { Type: HttpApi, Properties: { ApiId: !Ref PaisaApi, Path: /settings, Method: PUT } }
+        Connect: { Type: HttpApi, Properties: { ApiId: !Ref PaisaApi, Path: /connect, Method: POST } }
+        EmailSummary: { Type: HttpApi, Properties: { ApiId: !Ref PaisaApi, Path: /email-summary, Method: POST } }
+        # Cron without a server. Daily 06:00 IST: refresh the FX rate.
+        FxDaily:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: cron(0 6 * * ? *)
+            ScheduleExpressionTimezone: Asia/Kolkata
+            Input: '{"task": "fx"}'
+        # Daily 07:00 IST: threshold alerts and the monthly digest.
+        DigestDaily:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: cron(0 7 * * ? *)
+            ScheduleExpressionTimezone: Asia/Kolkata
+            Input: '{"task": "digest"}'
+
+  ApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/paisa-api
+      RetentionInDays: 7
+
+  # ---- Data: on-demand billing, no idle cost. ----
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{ AttributeName: pk, AttributeType: S }]
+      KeySchema: [{ AttributeName: pk, KeyType: HASH }]
+      TimeToLiveSpecification: { AttributeName: ttl, Enabled: true }
+
+  # Cost Explorer is billed per request, so spend is cached here (4 h TTL).
+  CacheTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{ AttributeName: pk, AttributeType: S }]
+      KeySchema: [{ AttributeName: pk, KeyType: HASH }]
+      TimeToLiveSpecification: { AttributeName: ttl, Enabled: true }
+
+  FxTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{ AttributeName: pk, AttributeType: S }]
+      KeySchema: [{ AttributeName: pk, KeyType: HASH }]
+
+Outputs:
+  ApiUrl:
+    Description: Base URL for the extension and the web dashboard
+    Value: !Sub https://${PaisaApi}.execute-api.${AWS::Region}.amazonaws.com

@@ -1,0 +1,49 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Paisa read-only role. Lets Paisa read your AWS cost data (billing figures only:
+  no resources, no data, no write access). Delete this stack to revoke access.
+
+Parameters:
+  ExternalId:
+    Type: String
+    Description: Your private Paisa connect ID (pre-filled by the Paisa link). Stops other AWS customers from tricking Paisa into reading your account.
+    MinLength: 16
+    AllowedPattern: "[A-Za-z0-9_-]+"
+  PaisaAccountId:
+    Type: String
+    Default: "600219017400"
+    Description: The AWS account that runs the Paisa backend.
+    AllowedPattern: "[0-9]{12}"
+
+Resources:
+  PaisaReadOnlyRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: PaisaReadOnlyRole
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${PaisaAccountId}:root
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref ExternalId
+      Policies:
+        - PolicyName: PaisaCostReadOnly
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ce:GetCostAndUsage
+                  - ce:GetCostForecast
+                  - ce:GetDimensionValues
+                Resource: "*"
+
+Outputs:
+  RoleArn:
+    Description: Paste this into Paisa
+    Value: !GetAtt PaisaReadOnlyRole.Arn
