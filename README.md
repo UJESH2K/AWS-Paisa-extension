@@ -42,7 +42,8 @@ No AWS credentials ever live in the browser, the dashboard or the extension. The
 - [x] Dashboard and onboarding UI (`web/`), running on labelled sample data until the API is deployed
 - [ ] AWS backend (SAM) and Cost Explorer caching
 - [ ] Read-only role template
-- [ ] Console badge extension
+- [x] Standalone extension (console badge + change tracking), works without the backend
+- [ ] Extension talking to the AWS API instead of reading the page
 
 ## Run the dashboard
 
@@ -69,3 +70,12 @@ python -m pytest backend/tests
 | POST | `/connect` | `{ roleArn }` (Bearer token) | `{ ok: true }` after a test AssumeRole and a 1-day Cost Explorer call |
 | GET | `/spend` | Bearer token | see `web/lib/types.ts` `SpendResponse` |
 | PUT | `/settings` | `{ entity, markup_pct, gst_pct }` | `{ ok: true }` |
+
+## Extension (Edge and Chrome)
+
+`extension/` is a Manifest V3 extension with no build step. In its standalone mode it needs no AWS access: it reads the dollar figure on the AWS Billing / Cost Management page, fetches a public USD to INR rate (frankfurter.dev, falling back to open.er-api.com), and shows the rupee estimate beside it. The popup tracks how the cost changes between readings and splits the change into "you spent more" and "the exchange rate moved".
+
+Build the store zip: `python scripts/package_extension.py` (writes `dist/paisa-extension-<version>.zip`).
+Load unpacked: `edge://extensions` (or `chrome://extensions`) > Developer mode > Load unpacked > pick `extension/`.
+
+The console DOM is not ours, so the badge finds amounts heuristically and fails silently; the popup calculator works anywhere.

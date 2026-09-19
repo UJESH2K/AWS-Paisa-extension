@@ -1,0 +1,79 @@
+/* Styles for elements Paisa injects into the AWS console. Kept quiet: the
+   figure should sit next to Amazon's own type, not compete with it. */
+.paisa-badge,
+.paisa-inline {
+  font-family: inherit;
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+
+.paisa-badge {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 1px 9px;
+  border: 1px solid #5b9dff;
+  border-radius: 999px;
+  background: #eaf2ff;
+  color: #0b3f91;
+  font-size: max(12px, 0.55em);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.7;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.paisa-badge:hover,
+.paisa-badge:focus-visible {
+  background: #d7e7ff;
+  outline: 2px solid #5b9dff;
+  outline-offset: 1px;
+}
+
+.paisa-inline {
+  margin-left: 6px;
+  color: #5f6b7a;
+  font-size: 0.85em;
+  font-weight: 400;
+}
+
+.paisa-pop {
+  position: fixed;
+  z-index: 2147483647;
+  width: 280px;
+  padding: 12px 14px;
+  border: 1px solid #2a3140;
+  border-radius: 10px;
+  background: #10141b;
+  color: #e9ecf1;
+  font: 12px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.paisa-pop-title {
+  margin-bottom: 8px;
+  color: #8892a3;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.paisa-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  border-top: 1px solid #222936;
+  font-variant-numeric: tabular-nums;
+}
+
+.paisa-strong {
+  font-weight: 700;
+}
+
+.paisa-pop-foot {
+  margin-top: 8px;
+  color: #6b7485;
+  font-size: 10.5px;
+}

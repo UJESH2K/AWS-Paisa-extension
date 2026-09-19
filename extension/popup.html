@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=380" />
+    <title>Paisa</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <span class="logo" aria-hidden="true">₹</span>
+      <h1>Paisa</h1>
+      <span class="chip warn">Estimate</span>
+    </header>
+
+    <section id="hero">
+      <p class="eyebrow" id="heroLabel">Your AWS bill in rupees</p>
+      <p class="big num" id="heroInr">—</p>
+      <p class="sub" id="heroSub"></p>
+      <div id="change" class="change" hidden></div>
+    </section>
+
+    <section id="breakdownSec" hidden>
+      <h2>Breakdown</h2>
+      <table class="num">
+        <tbody>
+          <tr><td id="bBaseLabel">Base</td><td id="bBase"></td></tr>
+          <tr><td id="bMarkupLabel">Card markup</td><td id="bMarkup"></td></tr>
+          <tr><td id="bGstLabel">GST</td><td id="bGst"></td></tr>
+          <tr class="total"><td>Total (estimate)</td><td id="bTotal"></td></tr>
+        </tbody>
+      </table>
+      <p class="note" id="projection" hidden></p>
+    </section>
+
+    <section id="emptySec">
+      <p class="note">
+        Open your AWS <strong>Billing</strong> or <strong>Cost Management</strong> page. Paisa reads the dollar
+        figure, shows the rupee cost beside it, and tracks how it changes. Or try the calculator below.
+      </p>
+    </section>
+
+    <section>
+      <h2>Your assumptions</h2>
+      <div class="seg" role="radiogroup" aria-label="AWS entity">
+        <label><input type="radio" name="entity" value="AWS_INC" /><span>AWS Inc (USD)</span></label>
+        <label><input type="radio" name="entity" value="AISPL" /><span>AISPL (INR)</span></label>
+      </div>
+      <div class="ctl" id="markupCtl">
+        <label for="markup">Card forex markup</label><output id="markupOut" class="num"></output>
+        <input id="markup" type="range" min="0" max="5" step="0.1" />
+      </div>
+      <div class="ctl">
+        <label for="gst">GST</label><output id="gstOut" class="num"></output>
+        <input id="gst" type="range" min="0" max="28" step="1" />
+      </div>
+      <div class="fx">
+        <div>
+          <span class="muted">USD → INR</span>
+          <strong class="num" id="fxRate">—</strong>
+        </div>
+        <button id="fxRefresh" type="button" class="ghost">Refresh</button>
+      </div>
+      <p class="note" id="fxNote"></p>
+      <div class="ctl inline">
+        <label for="manualFx">Override rate</label>
+        <input id="manualFx" type="number" min="0" step="0.01" placeholder="optional" class="num" />
+      </div>
+      <label class="check"><input id="showAll" type="checkbox" /> Show ₹ next to every $ figure on the page</label>
+    </section>
+
+    <section>
+      <h2>Calculator</h2>
+      <div class="calc">
+        <span class="muted">$</span>
+        <input id="calcUsd" type="number" min="0" step="0.01" placeholder="47.30" class="num" aria-label="USD amount" />
+        <output id="calcOut" class="num">—</output>
+      </div>
+      <button id="calcRecord" type="button" class="ghost" disabled>Record as a reading</button>
+    </section>
+
+    <section id="histSec" hidden>
+      <div class="row-head">
+        <h2>Readings</h2>
+        <button id="histClear" type="button" class="link">Clear</button>
+      </div>
+      <ul id="history"></ul>
+    </section>
+
+    <footer>Estimates only. Your bank's rate on the settlement date and your AWS entity decide the real figure. No AWS credentials are used; rates come from public FX sources.</footer>
+    <script src="convert.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
