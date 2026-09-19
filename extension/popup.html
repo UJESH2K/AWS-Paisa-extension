@@ -10,21 +10,17 @@
     <header>
       <span class="logo" aria-hidden="true">₹</span>
       <h1>Paisa</h1>
-      <span class="chip warn">Estimate</span>
+      <span class="chip warn" id="chip">Estimate</span>
     </header>
 
-    <section id="hero">
-      <p class="eyebrow" id="heroLabel">Your AWS bill in rupees</p>
-      <p class="big num" id="heroInr">—</p>
-      <p class="sub" id="heroSub"></p>
-      <div id="change" class="change" hidden></div>
-    </section>
-
-    <p class="scan" id="scanLine"></p>
-
-    <section id="breakdownSec" hidden>
-      <h2>Breakdown</h2>
-      <table class="num">
+    <!-- Your bill, from the Paisa API. Shown when signed in. -->
+    <section id="billSec" hidden>
+      <p class="eyebrow" id="billLabel">So far this month</p>
+      <p class="big num" id="billTotal">—</p>
+      <p class="sub" id="billSub"></p>
+      <p class="mid num" id="billProjection" hidden></p>
+      <p class="sub" id="billProjectionSub" hidden></p>
+      <table class="num" id="billTable">
         <tbody>
           <tr><td id="bBaseLabel">Base</td><td id="bBase"></td></tr>
           <tr><td id="bMarkupLabel">Card markup</td><td id="bMarkup"></td></tr>
@@ -32,14 +28,49 @@
           <tr class="total"><td>Total (estimate)</td><td id="bTotal"></td></tr>
         </tbody>
       </table>
-      <p class="note" id="projection" hidden></p>
+      <ul class="svcs" id="billServices"></ul>
+      <div class="actions">
+        <button id="billRefresh" type="button" class="btn">Refresh</button>
+        <button id="billEmail" type="button" class="btn">Email me this</button>
+      </div>
+      <p class="msg" id="billMsg" hidden></p>
+      <p class="note" id="billProvider"></p>
     </section>
 
-    <section id="emptySec">
-      <p class="note">
-        Open your AWS <strong>Billing</strong> or <strong>Cost Management</strong> page. Paisa reads the dollar
-        figure, shows the rupee cost beside it, and tracks how it changes. Or try the calculator below.
+    <!-- Sign in, when a server is configured but nobody is signed in. -->
+    <section id="authSec" hidden>
+      <h2 id="authTitle">See your real bill</h2>
+      <p class="note" id="authNote">Sign in with your email. We send a 6-digit code, so there's no password and no AWS keys.</p>
+      <label for="authEmail" id="authEmailLabel">Email</label>
+      <input id="authEmail" type="email" placeholder="you@example.com" autocomplete="email" />
+      <label for="authCode" id="authCodeLabel" hidden>6-digit code</label>
+      <input id="authCode" class="code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" hidden />
+      <div class="actions">
+        <button id="authGo" type="button" class="btn primary">Send me a code</button>
+        <button id="authBack" type="button" class="btn" hidden>Back</button>
+      </div>
+      <p class="msg err" id="authMsg" hidden></p>
+    </section>
+
+    <!-- Standalone mode: readings taken from the console page itself. -->
+    <section id="heroSec">
+      <p class="eyebrow" id="heroLabel">Your AWS bill in rupees</p>
+      <p class="big num" id="heroInr">—</p>
+      <p class="sub" id="heroSub"></p>
+      <div id="change" class="change" hidden></div>
+      <table class="num" id="heroTable" hidden>
+        <tbody>
+          <tr><td id="hBaseLabel">Base</td><td id="hBase"></td></tr>
+          <tr><td id="hMarkupLabel">Card markup</td><td id="hMarkup"></td></tr>
+          <tr><td id="hGstLabel">GST</td><td id="hGst"></td></tr>
+          <tr class="total"><td>Total (estimate)</td><td id="hTotal"></td></tr>
+        </tbody>
+      </table>
+      <p class="note" id="heroEmpty">
+        Open your AWS <strong>Billing</strong> page and use the <strong>₹ Bill</strong> button there, or try the
+        calculator below.
       </p>
+      <p class="scan" id="scanLine"></p>
     </section>
 
     <section>
@@ -56,12 +87,14 @@
         <label for="gst">GST</label><output id="gstOut" class="num"></output>
         <input id="gst" type="range" min="0" max="28" step="1" />
       </div>
+      <p class="note" id="settingsScope"></p>
+    </section>
+
+    <section>
+      <h2>USD → INR</h2>
       <div class="fx">
-        <div>
-          <span class="muted">USD → INR</span>
-          <strong class="num" id="fxRate">—</strong>
-        </div>
-        <button id="fxRefresh" type="button" class="ghost">Refresh</button>
+        <strong class="num" id="fxRate">—</strong>
+        <button id="fxRefresh" type="button" class="btn">Refresh</button>
       </div>
       <p class="note" id="fxNote"></p>
       <div class="ctl inline">
@@ -78,7 +111,7 @@
         <input id="calcUsd" type="number" min="0" step="0.01" placeholder="47.30" class="num" aria-label="USD amount" />
         <output id="calcOut" class="num">—</output>
       </div>
-      <button id="calcRecord" type="button" class="ghost" disabled>Record as a reading</button>
+      <button id="calcRecord" type="button" class="btn" disabled>Record as a reading</button>
     </section>
 
     <section id="histSec" hidden>
@@ -89,7 +122,10 @@
       <ul id="history"></ul>
     </section>
 
-    <footer>Estimates only. Your bank's rate on the settlement date and your AWS entity decide the real figure. No AWS credentials are used; rates come from public FX sources.</footer>
+    <footer>
+      <span id="who"></span>
+      Estimates only. Your bank's rate on the settlement date and your AWS entity decide the real figure.
+    </footer>
     <script src="convert.js"></script>
     <script src="popup.js"></script>
   </body>

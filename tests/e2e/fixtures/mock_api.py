@@ -16,7 +16,8 @@ RAW = {
     "source": "self",
 }
 FX = {"rate": 95.88, "fetchedAt": "2026-09-19T00:30:00+00:00", "source": "frankfurter.dev (ECB)"}
-SETTINGS = {"entity": "AWS_INC", "markup_pct": 0.035, "gst_pct": 0.18, "digest": "monthly", "threshold_inr": None}
+DEFAULT_SETTINGS = {"entity": "AWS_INC", "markup_pct": 0.035, "gst_pct": 0.18, "digest": "monthly", "threshold_inr": None}
+SETTINGS = {}  # per-email, so a settings change is observable
 STARTS = {}
 CONNECTED = set()
 LOG = []
@@ -37,6 +38,9 @@ class H(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
+
+    def _settings(self, email):
+        return SETTINGS.setdefault(email, dict(DEFAULT_SETTINGS))
 
     def do_OPTIONS(self):
         self._send(204, {})
@@ -67,7 +71,7 @@ class H(BaseHTTPRequestHandler):
                 "connected": email in CONNECTED,
                 "roleArn": "arn:aws:iam::123456789012:role/PaisaReadOnlyRole" if email in CONNECTED else None,
                 "isOwner": not email.startswith("stranger"),
-                "settings": SETTINGS,
+                "settings": self._settings(email),
             })
         if path == "/spend":
             email = self._email()
@@ -76,7 +80,22 @@ class H(BaseHTTPRequestHandler):
             if email.startswith("stranger") and email not in CONNECTED:
                 return self._send(409, {"error": "Connect your AWS account to see your bill."})
             today = datetime.now(timezone.utc).date()
-            return self._send(200, report.build_summary(RAW, FX, SETTINGS, today.day, report.days_in_month(today), f"{today:%Y-%m}", today.isoformat()))
+            return self._send(200, report.build_summary(RAW, FX, self._settings(email), today.day, report.days_in_month(today), f"{today:%Y-%m}", today.isoformat()))
+        self._send(404, {"error": "Not found."})
+
+    def do_PUT(self):
+        path = self.path.split("?")[0]
+        body = self._body()
+        LOG.append(("PUT", path))
+        if path == "/settings":
+            email = self._email()
+            if not email:
+                return self._send(401, {"error": "Sign in to continue."})
+            current = self._settings(email)
+            for key in ("entity", "markup_pct", "gst_pct", "digest", "threshold_inr"):
+                if key in body:
+                    current[key] = body[key]
+            return self._send(200, {"ok": True, "settings": current})
         self._send(404, {"error": "Not found."})
 
     def do_POST(self):

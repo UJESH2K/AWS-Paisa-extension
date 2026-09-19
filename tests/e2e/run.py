@@ -26,6 +26,7 @@ SUITES = {
     "badge": ("badge.mjs", "ext-panel"),
     "panel": ("panel.mjs", "ext-panel"),
     "panel-noapi": ("panel.mjs", "ext-noapi"),
+    "popup": ("popup.mjs", "ext-panel"),
     "theme": ("theme.mjs", "ext-panel"),
 }
 
@@ -71,31 +72,46 @@ def wait_for_port(port, timeout=15):
     return False
 
 
-def start_servers():
-    procs = []
-    if port_is_free(SITE_PORT):
-        procs.append(
-            subprocess.Popen(
-                [sys.executable, "-m", "http.server", str(SITE_PORT)],
-                cwd=E2E / "fixtures" / "site",
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-        )
-    if port_is_free(API_PORT):
-        procs.append(
-            subprocess.Popen(
-                [sys.executable, str(E2E / "fixtures" / "mock_api.py")],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-        )
-    for port, what in ((SITE_PORT, "fixture site"), (API_PORT, "stand-in API")):
-        if not wait_for_port(port):
-            for p in procs:
-                p.terminate()
-            raise SystemExit(f"The {what} did not start on port {port}.")
-    return procs
+def wait_for_port_free(port, timeout=15):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if port_is_free(port):
+            return True
+        time.sleep(0.2)
+    return False
+
+
+def start_site_server():
+    """Static fixture pages. Stateless, so one instance serves every suite."""
+    if not port_is_free(SITE_PORT):
+        return None
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "http.server", str(SITE_PORT)],
+        cwd=E2E / "fixtures" / "site",
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if not wait_for_port(SITE_PORT):
+        proc.terminate()
+        raise SystemExit(f"The fixture site did not start on port {SITE_PORT}.")
+    return proc
+
+
+def start_api_server():
+    """The stand-in API accumulates state (sessions, settings, connected roles),
+    so each suite gets its own instance. Sharing one made results depend on the
+    order suites ran in."""
+    if not wait_for_port_free(API_PORT):
+        raise SystemExit(f"Port {API_PORT} is still in use; a previous stand-in API did not exit.")
+    proc = subprocess.Popen(
+        [sys.executable, str(E2E / "fixtures" / "mock_api.py")],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if not wait_for_port(API_PORT):
+        proc.terminate()
+        raise SystemExit(f"The stand-in API did not start on port {API_PORT}.")
+    return proc
 
 
 def main():
@@ -108,12 +124,12 @@ def main():
         raise SystemExit("node is required to run the browser suites.")
 
     build_extension_copies()
-    servers = start_servers()
+    site = start_site_server()
     results = {}
     try:
         for name in wanted:
             script, ext = SUITES[name]
-            print(f"\n{'=' * 60}\n{name}\n{'=' * 60}")
+            print(f"\n{'=' * 60}\n{name}\n{'=' * 60}", flush=True)
             mode = "noapi" if name.endswith("-noapi") else ""
             cmd = [
                 "node",
@@ -123,10 +139,15 @@ def main():
             ]
             if mode:
                 cmd.append(mode)
-            results[name] = subprocess.run(cmd, cwd=ROOT).returncode == 0
+            api = start_api_server()  # a clean API per suite
+            try:
+                results[name] = subprocess.run(cmd, cwd=ROOT).returncode == 0
+            finally:
+                api.terminate()
+                api.wait(timeout=10)
     finally:
-        for p in servers:
-            p.terminate()
+        if site:
+            site.terminate()
 
     print(f"\n{'=' * 60}")
     for name, ok in results.items():
