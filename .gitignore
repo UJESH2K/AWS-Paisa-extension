@@ -39,3 +39,10 @@ dist/*.crx
 dist/*.pem
 *.crx
 *.pem
+
+# Coverage output, and the raw logo the icons were derived from: the processed
+# copy in extension/icons/ is what ships.
+.coverage
+.coverage.*
+htmlcov/
+Aws-PNG-Pic.png
