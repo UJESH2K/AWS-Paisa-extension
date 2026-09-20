@@ -41,6 +41,7 @@
     "@media (prefers-reduced-motion:reduce){.drawer{transition:none}}",
 
     "header{display:flex;align-items:center;gap:8px;padding:14px 20px;border-bottom:1px solid var(--line-soft)}",
+    "header .awsmark{width:36px;height:22px;display:block;flex:none}",
     "header .logo{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;",
     "border-radius:4px;background:var(--accent);color:var(--on-accent);font-weight:700}",
     "header h1{flex:1;margin:0;font-size:16px;font-weight:700;letter-spacing:-.01em}",
@@ -715,7 +716,9 @@
     headChip = h("span", { class: "chip", text: "Estimate" });
     body = h("div", { class: "body" });
     drawer = h("aside", { class: "drawer", role: "dialog", "aria-label": "Paisa: your AWS bill in rupees", "aria-hidden": "true" }, [
-      h("header", null, [h("span", { class: "logo", text: "₹" }), h("h1", { text: "Paisa" }), headChip, (closeBtn = h("button", { class: "x", type: "button", "aria-label": "Close Paisa", onclick: function () { toggle(false); }, text: "×" }))]),
+      h("header", null, [
+        h("img", { class: "awsmark", src: chrome.runtime.getURL("icons/aws.png"), alt: "", width: "36", height: "22" }),
+        h("h1", { text: "Paisa" }), headChip, (closeBtn = h("button", { class: "x", type: "button", "aria-label": "Close Paisa", onclick: function () { toggle(false); }, text: "×" }))]),
       body,
     ]);
     // Keep the console's keyboard shortcuts from firing while typing here.

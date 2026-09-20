@@ -88,7 +88,7 @@ python -m pytest backend/tests -q
 python tests/e2e/run.py
 ```
 
-> "101 backend tests against mocked AWS, and 155 checks that load the real extension into a real browser and drive it. Including the ones that matter: that Cost Explorer is called exactly once across repeated reads, and that the session token never reaches the page."
+> "101 backend tests against mocked AWS, and 156 checks that load the real extension into a real browser and drive it. Including the ones that matter: that Cost Explorer is called exactly once across repeated reads, and that the session token never reaches the page."
 
 **Check these numbers against what the run actually prints before you say them.** They go up most times anyone touches the repo, and a figure that contradicts the terminal on screen is the easiest kind of mistake to avoid. `python scripts/check_docs.py` verifies them.
 

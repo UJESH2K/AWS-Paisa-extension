@@ -52,6 +52,12 @@ try {
     "rgb(35, 47, 62) / rgb(255, 153, 0)",
   );
   c.check("and carries a mark, not a bare glyph", await dark.ev(`!!${PANEL_SHADOW}.querySelector('.fab svg.mark')`), true);
+  // A broken <img> still exists in the DOM, so check it actually decoded.
+  c.check(
+    "the header mark loads rather than showing a broken image",
+    await dark.ev(`(()=>{const i=${PANEL_SHADOW}.querySelector('header img.awsmark'); return !!i && i.complete && i.naturalWidth > 0;})()`),
+    true,
+  );
   if (shotDir) await dark.screenshot(`${shotDir}/panel-on-dark-console.png`);
 
   // ---- usable without a mouse ----

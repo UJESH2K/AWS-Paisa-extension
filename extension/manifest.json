@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Paisa - AWS bill in rupees",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Adds a ₹ Bill button to the AWS console: your bill in rupees after forex, card markup and GST, the expected month-end bill, and email summaries. Estimates only.",
   "permissions": [
     "storage"
@@ -61,7 +61,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "report.html"
+        "report.html",
+        "icons/aws.png"
       ],
       "matches": [
         "https://console.aws.amazon.com/*",

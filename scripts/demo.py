@@ -57,6 +57,8 @@ def build(standalone=False):
     for script in m["content_scripts"]:
         script["matches"] = [f"http://localhost:{SITE_PORT}/*", "https://console.aws.amazon.com/*", "https://*.console.aws.amazon.com/*"]
     m["host_permissions"] += [f"http://localhost:{SITE_PORT}/*", f"http://localhost:{API_PORT}/*"]
+    for entry in m.get("web_accessible_resources", []):
+        entry["matches"] = entry.get("matches", []) + [f"http://localhost:{SITE_PORT}/*"]
     (WORK / "manifest.json").write_text(json.dumps(m, indent=2, ensure_ascii=False), encoding="utf-8")
     # Standalone means no backend at all — exactly what someone gets when they
     # install the extension and nothing has been deployed.

@@ -87,6 +87,9 @@ def build_extension_copies(source=None):
         manifest["content_scripts"][0]["matches"] = [f"http://localhost:{SITE_PORT}/*"]
         manifest["content_scripts"][1]["matches"] = [f"http://localhost:{SITE_PORT}/*"]
         manifest["host_permissions"] += [f"http://localhost:{SITE_PORT}/*", f"http://localhost:{API_PORT}/*"]
+        # Images and the report page are only reachable on origins listed here.
+        for entry in manifest.get("web_accessible_resources", []):
+            entry["matches"] = entry.get("matches", []) + [f"http://localhost:{SITE_PORT}/*"]
         (dest / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
         if api_url:
             (dest / "config.js").write_text(
