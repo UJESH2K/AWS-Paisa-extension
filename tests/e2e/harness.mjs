@@ -88,13 +88,12 @@ export async function launch({ extDir, port, profileTag = "paisa" }) {
     // though the extension itself is fine there. Say so, rather than letting it
     // read as a product failure.
     const chromeNote = /chrome\.exe|google-chrome/i.test(browser)
-      ? "
-
-Chrome no longer honours --load-extension, so these suites cannot automate it." +
-        "
-Run them in Edge (unset PAISA_BROWSER), and load the extension in Chrome by hand" +
-        "
-via chrome://extensions > Developer mode > Load unpacked."
+      ? [
+          "",
+          "Chrome no longer honours --load-extension, so these suites cannot automate it.",
+          "Run them in Edge (unset PAISA_BROWSER), and load the extension in Chrome by hand",
+          "via chrome://extensions > Developer mode > Load unpacked.",
+        ].join("\n")
       : "";
     throw new Error(`The extension did not load (no service worker appeared) in ${browser}.${chromeNote}`);
   }

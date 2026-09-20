@@ -14,6 +14,10 @@ python scripts/package_extension.py     # writes dist/paisa-extension-<version>.
 
 - [ ] A **privacy policy at a public URL**. Both stores require one because Paisa handles an email address. `PRIVACY.md` is written for this — publish it (GitHub renders it at a stable URL) and fill in the contact address at the top first.
 - [ ] Decide what the listing says about the backend. If the API is not deployed, say in the description that the extension works standalone and that connecting an AWS account requires the hosted service. Do not describe a service that is not running.
+- [ ] **Listing icon**: `extension/icons/store-icon.png` (300x300). It is AWS's orange
+      and squid ink with a rupee, deliberately **not** the AWS logo — an extension whose
+      store icon is Amazon's mark presents itself as AWS-published, which both stores
+      reject and which misleads people regardless of the rules.
 - [ ] Screenshots. `python tests/e2e/run.py` writes usable ones to `tests/e2e/.work/screenshots/`. Both stores want 1280×800 or 640×400.
 
 ## Listing copy

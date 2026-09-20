@@ -10,7 +10,7 @@ See what your AWS bill actually costs in rupees, after forex, card markup and GS
 
 No account, no sign-up, no backend. It reads the figure already on your own AWS billing page.
 
-1. Download `dist/paisa-extension-0.9.1.zip` and unzip it anywhere.
+1. Download `dist/paisa-extension-1.0.0.zip` and unzip it anywhere.
 2. Open `edge://extensions` (or `chrome://extensions`), turn on **Developer mode**,
    click **Load unpacked**, and pick the unzipped folder.
 3. Open your **AWS Billing and Cost Management** console — and reload the tab if it

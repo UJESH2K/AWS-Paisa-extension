@@ -10,7 +10,7 @@ Everything that could be built and verified without you has been. What remains n
 
 | | State |
 |---|---|
-| Extension (button, panel, badges, popup) | Built. `dist/paisa-extension-0.9.1.zip` |
+| Extension (button, panel, badges, popup) | Built. `dist/paisa-extension-1.0.0.zip` |
 | Backend (API, auth, spend, emails, schedules) | Written, tested, template validates. **Not deployed** |
 | Dashboard (`web/`) | Built and tested. **Not deployed** |
 | Tests | 101 backend (98% coverage), 156 browser checks across 6 suites. All green locally |
