@@ -2,6 +2,8 @@
 
 See what your AWS bill actually costs in rupees, after forex, card markup and GST, before the invoice lands.
 
+> **If you are picking this up to finish the submission, read [SUBMISSION.md](SUBMISSION.md) first** — it lists what is done, what is not, and the order to do the rest in.
+>
 > Work in progress for the WeMakeDevs "First Commit" hackathon (Ship It track). Every rupee figure Paisa shows is an **estimate**: GST, forex and card-markup treatment depend on your AWS entity and card issuer, so they are user settings, not hard-coded assumptions.
 
 ## Architecture
@@ -64,7 +66,7 @@ npm run dev
 ```
 python -m pytest backend/tests     # 101 tests: conversion maths, auth, caching,
                                    # spend sources, emails, API routes (moto, no AWS)
-python tests/e2e/run.py            # 6 browser suites (138 checks): the extension and the dashboard
+python tests/e2e/run.py            # 6 browser suites (142 checks): the extension and the dashboard
 cd web && npm run lint && npm run build
 ```
 

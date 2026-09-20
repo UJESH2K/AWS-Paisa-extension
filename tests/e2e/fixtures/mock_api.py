@@ -23,6 +23,7 @@ STARTS = {}
 CONNECTED = set()
 DELETED = set()
 HANG = {"on": False}
+ZERO = {"on": False}  # a brand-new account with no spend yet
 LOG = []
 ROLE_ARN = re.compile(r"^arn:aws:iam::\d{12}:role/[\w+=,.@/-]{1,200}$")
 
@@ -86,7 +87,8 @@ class H(BaseHTTPRequestHandler):
             if email.startswith("stranger") and email not in CONNECTED:
                 return self._send(409, {"error": "Connect your AWS account to see your bill."})
             today = datetime.now(timezone.utc).date()
-            return self._send(200, report.build_summary(RAW, FX, self._settings(email), today.day, report.days_in_month(today), f"{today:%Y-%m}", today.isoformat()))
+            raw = {"usd": 0.0, "services": [], "cachedAt": RAW["cachedAt"], "source": "self"} if ZERO["on"] else RAW
+            return self._send(200, report.build_summary(raw, FX, self._settings(email), today.day, report.days_in_month(today), f"{today:%Y-%m}", today.isoformat()))
         self._send(404, {"error": "Not found."})
 
     def do_PUT(self):
@@ -132,6 +134,9 @@ class H(BaseHTTPRequestHandler):
                 return self._send(400, {"error": "Paisa couldn't assume that role. Check its trust policy."})
             CONNECTED.add(email)
             return self._send(200, {"ok": True, "connected": True})
+        if path == "/_zero":
+            ZERO["on"] = bool(body.get("on"))
+            return self._send(200, {"ok": True, "zero": ZERO["on"]})
         if path == "/_hang":
             HANG["on"] = bool(body.get("on"))
             return self._send(200, {"ok": True, "hanging": HANG["on"]})

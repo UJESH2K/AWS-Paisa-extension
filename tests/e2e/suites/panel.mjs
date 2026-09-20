@@ -172,6 +172,22 @@ try {
     true,
   );
 
+  // ---- a brand-new account with no spend at all ----
+  // The likeliest first experience: free tier, nothing billed yet. Zero has to
+  // read as "nothing yet", not as a broken panel.
+  await setStorage({ session: { token: "tok-owner@example.com", email: "owner@example.com" } });
+  await fetch(`${API}/_zero`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ on: true }) });
+  const empty = await openPage(PORT, `${SITE}/home.html`);
+  const ed = panelDriver(empty);
+  await empty.waitFor(`!!${PANEL_HOST}`);
+  await ed.open();
+  c.check("an account with no spend still loads", await ed.has("So far", 12000), true);
+  const zeroText = await ed.text();
+  c.check("it shows zero rupees rather than an error", zeroText, (s) => s.includes(inr0(0)));
+  c.check("and explains why zero is plausible", zeroText, (s) => s.includes("No charges so far this month"));
+  c.check("it does not invent a projection", zeroText, (s) => !/₹[1-9]/.test(s.split("Where it comes from")[0] ?? s));
+  await fetch(`${API}/_zero`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ on: false }) });
+
   // ---- a server that accepts the connection and never answers ----
   await setStorage({ session: { token: "tok-owner@example.com", email: "owner@example.com" } });
   await fetch(`${API}/_hang`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ on: true }) });
@@ -198,7 +214,7 @@ try {
   c.check("and the scanner never badges the panel itself", await billing.ev(`${PANEL_SHADOW}.querySelectorAll('[data-paisa]').length`), 0);
   if (shotDir) await billing.screenshot(`${shotDir}/panel-over-billing.png`);
 
-  const errors = [...page.errors, ...ext.errors, ...stuck.errors, ...billing.errors];
+  const errors = [...page.errors, ...ext.errors, ...empty.errors, ...stuck.errors, ...billing.errors];
   c.check("no console errors", errors.length, 0);
   if (errors.length) console.log(errors);
 } finally {
