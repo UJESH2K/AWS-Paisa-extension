@@ -102,7 +102,7 @@
   var ROLE_ARN_RE = /^arn:aws:iam::\d{12}:role\/[\w+=,.@/-]{1,200}$/;
   var state = { open: false, view: "loading", session: null, me: null, config: {}, summary: null, sample: false,
     email: "", arn: "", arnGuess: undefined, error: "", notice: "", noticeKind: "info", busy: false, last: null };
-  var host, root, fabAmt, drawer, body, headChip;
+  var host, root, fab, fabAmt, drawer, body, headChip, closeBtn;
 
   function h(tag, props, kids) {
     var e = document.createElement(tag);
@@ -559,6 +559,8 @@
     if (!drawer) return;
     drawer.classList.toggle("open", state.open);
     drawer.setAttribute("aria-hidden", state.open ? "false" : "true");
+    if ("inert" in drawer) drawer.inert = !state.open;
+    if (fab) fab.setAttribute("aria-expanded", state.open ? "true" : "false");
     fabAmt.textContent = state.summary && !state.sample ? "≈ " + C.inr(state.summary.breakdown.total, 0) : state.last && state.session ? "≈ " + C.inr(state.last.total, 0) : "Bill";
     headChip.textContent = state.sample ? "Sample data" : "Estimate";
     if (!state.open) return;
@@ -577,9 +579,18 @@
   }
 
   function toggle(open) {
+    var was = state.open;
     state.open = open === undefined ? !state.open : open;
     if (state.open && (state.view === "loading" || state.view === "signin") && !state.summary) init();
     render();
+    if (state.open === was) return;
+    // Move focus with the panel, so it can be used without a mouse.
+    if (state.open) {
+      var first = body.querySelector("input, button, a[href]") || closeBtn;
+      if (first) first.focus();
+    } else if (fab) {
+      fab.focus();
+    }
   }
 
   function build() {
@@ -593,11 +604,17 @@
       root.appendChild(h("style", { text: CSS }));
     }
     fabAmt = h("span", { class: "amt", text: "Bill" });
-    var fab = h("button", { class: "fab", "aria-label": "Open Paisa: your AWS bill in rupees", onclick: function () { toggle(); } }, [h("span", { class: "logo", text: "₹" }), fabAmt]);
+    fab = h("button", {
+      class: "fab",
+      type: "button",
+      "aria-label": "Paisa: your AWS bill in rupees",
+      "aria-expanded": "false",
+      onclick: function () { toggle(); },
+    }, [h("span", { class: "logo", text: "₹" }), fabAmt]);
     headChip = h("span", { class: "chip", text: "Estimate" });
     body = h("div", { class: "body" });
     drawer = h("aside", { class: "drawer", role: "dialog", "aria-label": "Paisa: your AWS bill in rupees", "aria-hidden": "true" }, [
-      h("header", null, [h("span", { class: "logo", text: "₹" }), h("h1", { text: "Paisa" }), headChip, h("button", { class: "x", "aria-label": "Close", onclick: function () { toggle(false); }, text: "×" })]),
+      h("header", null, [h("span", { class: "logo", text: "₹" }), h("h1", { text: "Paisa" }), headChip, (closeBtn = h("button", { class: "x", type: "button", "aria-label": "Close Paisa", onclick: function () { toggle(false); }, text: "×" }))]),
       body,
     ]);
     // Keep the console's keyboard shortcuts from firing while typing here.

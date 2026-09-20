@@ -57,13 +57,43 @@ try {
   await dark.ev("document.body.classList.add('awsui-dark-mode'); document.body.style.background='#0f1b2a'");
   c.check("and back to dark", await dark.waitFor(`${PANEL_HOST}.getAttribute('data-theme')==='dark'`, 6000), true);
 
+  // ---- usable without a mouse ----
+  const light2 = await openPage(PORT, `${SITE}/home.html`);
+  await light2.waitFor(`!!${PANEL_HOST}`);
+  await sleep(500);
+  c.check(
+    "a closed panel stays out of the console's tab order",
+    await light2.ev(`(()=>{const d=${PANEL_SHADOW}.querySelector('.drawer'); return d.inert === true;})()`),
+    true,
+  );
+  c.check("the button says it is collapsed", await light2.ev(`${PANEL_SHADOW}.querySelector('.fab').getAttribute('aria-expanded')`), "false");
+
+  await light2.ev(`${PANEL_SHADOW}.querySelector('.fab').click()`);
+  await sleep(400);
+  c.check("opening it announces the change", await light2.ev(`${PANEL_SHADOW}.querySelector('.fab').getAttribute('aria-expanded')`), "true");
+  c.check("and the panel joins the tab order", await light2.ev(`${PANEL_SHADOW}.querySelector('.drawer').inert`), false);
+  c.check(
+    "focus moves into the panel",
+    await light2.ev(`(()=>{const a=${PANEL_SHADOW}.activeElement; return !!(a && a.closest('.drawer'));})()`),
+    true,
+  );
+
+  await light2.ev(`${PANEL_SHADOW}.querySelector('.drawer').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))`);
+  await sleep(400);
+  c.check("Escape closes it", await light2.ev(`${PANEL_SHADOW}.querySelector('.drawer').classList.contains('open')`), false);
+  c.check(
+    "and focus returns to the button rather than being lost",
+    await light2.ev(`${PANEL_SHADOW}.activeElement === ${PANEL_SHADOW}.querySelector('.fab')`),
+    true,
+  );
+
   // ---- the console is a single-page app and re-renders whole subtrees ----
   await dark.ev("document.getElementById('wipe') && document.getElementById('wipe').click()");
   await dark.ev(`${PANEL_HOST} && ${PANEL_HOST}.remove()`);
   c.check("it re-attaches after the console removes it", await dark.waitFor(`!!${PANEL_HOST}`, 8000), true);
   c.check("and is still themed correctly", await dark.ev(`${PANEL_HOST}.getAttribute('data-theme')`), "dark");
 
-  const errors = [...light.errors, ...dark.errors];
+  const errors = [...light.errors, ...light2.errors, ...dark.errors];
   c.check("no uncaught exceptions", errors.length, 0);
   if (errors.length) console.log(errors);
 } finally {

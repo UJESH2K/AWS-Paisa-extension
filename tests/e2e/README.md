@@ -25,7 +25,7 @@ Set `PAISA_BROWSER` if Edge/Chrome is not in a standard location.
 | `panel` | The ₹ Bill button and panel: email sign-in, the bill and its breakdown, emailing a summary, refresh, persistence across reloads, sign-out, stale sessions, and an account with no connected role |
 | `popup` | The toolbar popup: the same bill as the panel, signing in from the popup, and the settings-sync guarantee — a change there reaches the server, so the page badges, the panel and the emailed summary never disagree |
 | `panel-noapi` | A build with no API URL: it must say so plainly and offer a clearly labelled sample, not a sign-in form that cannot work |
-| `theme` | That the panel belongs on the page: follows the console's light/dark theme live, uses the console's type and colour, and re-attaches when the SPA removes it |
+| `theme` | That the panel belongs on the page: follows the console's light/dark theme live, uses the console's type and colour, re-attaches when the SPA removes it, and stays out of the console's tab order until it is opened |
 
 ## Notes for anyone extending these
 

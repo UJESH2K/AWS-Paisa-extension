@@ -35,6 +35,7 @@ No AWS credentials ever live in the browser, the dashboard or the extension. The
 | `web/` | Next.js (App Router, Tailwind) dashboard, deployable on Vercel |
 | `extension/` | Manifest V3 extension for Edge and Chrome (console badge) |
 | `onboarding/` | CloudFormation template the user installs to grant read-only cost access |
+| `docs/` | `architecture.md` (how it fits together) and `demo.md` (the recording plan) |
 
 ## Status
 
@@ -63,7 +64,7 @@ npm run dev
 ```
 python -m pytest backend/tests     # 76 tests: conversion maths, auth, caching,
                                    # spend sources, emails, API routes (moto, no AWS)
-python tests/e2e/run.py            # 5 browser suites (100 checks) driving the real extension
+python tests/e2e/run.py            # 5 browser suites (107 checks) driving the real extension
 cd web && npm run lint && npm run build
 ```
 
