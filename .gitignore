@@ -19,6 +19,8 @@ samconfig.toml.bak
 
 # Packaging / OS / editor
 *.zip
+# except the packaged extension, so it can be installed without a build step
+!dist/paisa-extension-*.zip
 node_modules/
 .DS_Store
 Thumbs.db
@@ -30,6 +32,10 @@ tests/e2e/.work/
 
 # Packing an extension in Edge/Chrome produces these next to the source.
 # ext.pem is a PRIVATE SIGNING KEY: never commit it, never share it.
-dist/
+# The packaged zip IS committed, so anyone can install it without a build step;
+# git cannot re-include a file under an excluded directory, hence the specifics.
+dist/ext/
+dist/*.crx
+dist/*.pem
 *.crx
 *.pem
