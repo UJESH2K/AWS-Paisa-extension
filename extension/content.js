@@ -22,6 +22,10 @@
     { re: /forecast|estimated/i, name: "Forecast", score: 1 },
   ];
   var BILLING_URL = /billing|cost|payment|invoice/i;
+  // Money on a billing page that is not what you owe. A free-plan account's
+  // "Credits remaining $100.00" is the only dollar figure on the page, and
+  // converting it to rupees as if it were spend would be actively misleading.
+  var NOT_SPEND = /credit|free tier|remaining|savings|discount|refund|coupon|balance/i;
   var HISTORY_MAX = 50;
   var RECORD_EVERY_MS = 12 * 60 * 60 * 1000;
   var TOP = window === window.top;
@@ -99,9 +103,23 @@
       }
       if (!best || seen.has(best) || !visible(best)) continue;
       seen.add(best);
+      if (isNotSpend(best)) continue;
       found.push({ el: best, usd: parseAmount(amountText(best)) });
     }
     return found;
+  }
+
+  // True when the figure sits under wording that means it is not spend. Kept
+  // deliberately tight — only the figure's own small container counts, or a
+  // page that merely mentions credits elsewhere would silence everything.
+  function isNotSpend(el) {
+    var e = el.parentElement;
+    for (var i = 0; e && i < 2; i++, e = e.parentElement) {
+      var text = e.textContent;
+      if (text.length > 120) break;
+      if (NOT_SPEND.test(text)) return true;
+    }
+    return false;
   }
 
   function labelFor(el) {

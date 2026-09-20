@@ -137,7 +137,23 @@ try {
     0,
   );
 
-  const errors = [...page.errors, ...popup.errors, ...popup2.errors, ...other.errors, ...empty.errors, ...market.errors];
+  // A real free-plan Billing home: every cost widget fails to load, and the
+  // only dollar figure is remaining credits. Converting that would be worse
+  // than showing nothing.
+  const nodata = await openPage(PORT, `${SITE}/billing-nodata.html`);
+  await sleep(2500);
+  c.check(
+    "remaining credits are never converted as if they were spend",
+    await nodata.ev("document.querySelectorAll('.paisa-badge,.paisa-inline').length"),
+    0,
+  );
+  c.check(
+    "but the panel button is still there to open",
+    await nodata.ev(`!!document.querySelector('[data-paisa="panel-root"]')`),
+    true,
+  );
+
+  const errors = [...page.errors, ...popup.errors, ...popup2.errors, ...other.errors, ...empty.errors, ...market.errors, ...nodata.errors];
   c.check("no console errors anywhere", errors.length, 0);
   if (errors.length) console.log(errors);
 } finally {
