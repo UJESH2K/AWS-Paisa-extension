@@ -91,7 +91,22 @@ try {
     (s) => s.includes("Connect your AWS account"),
   );
 
-  const errors = [...p1.errors, ...p2.errors, ...p3.errors];
+  // ---- deleting your data ----
+  const p4 = await openPage(PORT, POPUP);
+  await p4.ev("new Promise(r=>chrome.storage.local.set({session:{token:'tok-owner@example.com',email:'owner@example.com'}},()=>r(true)))");
+  const p5 = await openPage(PORT, POPUP);
+  await p5.waitFor(`!${el("acctSec")}.hidden`);
+  c.check("a signed-in user is offered deletion", await visible(p5, "acctSec"), true);
+  c.check("deletion is not one careless click", await visible(p5, "deleteConfirm"), false);
+  await click(p5, "deleteAcct");
+  c.check("confirming warns it cannot be undone", await p5.ev(`${el("deleteConfirm")}.innerText`), (s) => s.includes("cannot be undone"));
+  c.check("and is honest that the AWS role is not ours to delete", await p5.ev(`${el("deleteConfirm")}.innerText`), (s) => s.includes("CloudFormation"));
+  await click(p5, "deleteYes");
+  c.check("deleting says what is left behind", await p5.waitFor(`${el("acctMsg")}.textContent.includes('Deleted')`), true);
+  c.check("the local session is cleared too", await p5.ev("new Promise(r=>chrome.storage.local.get('session',d=>r(d.session||null)))"), null);
+  c.check("and it falls back to the signed-out view", await visible(p5, "authSec"), true);
+
+  const errors = [...p1.errors, ...p2.errors, ...p3.errors, ...p4.errors, ...p5.errors];
   c.check("no console errors", errors.length, 0);
   if (errors.length) console.log(errors);
 } finally {

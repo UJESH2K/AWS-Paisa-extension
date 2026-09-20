@@ -140,3 +140,52 @@ def test_scheduled_digest_task_dispatch(aws, outbox):
 
     with _p.raises(ValueError):
         api.handler({"task": "nope"}, None)
+
+
+def test_delete_account_erases_everything_we_hold(session, outbox, monkeypatch):
+    import boto3
+
+    import settings_handler
+    from common import cache_table, sha, users_table
+
+    # Give the user something to delete: a cached spend entry and a second session.
+    call("GET /spend", token=session)
+    me = call("GET /me", token=session)[1]
+    assert me["email"] == OWNER
+
+    deleted_topics = []
+    monkeypatch.setattr(settings_handler.notify, "delete_topic", lambda arn: deleted_topics.append(arn))
+
+    status, body = call("POST /account/delete", token=session)
+    assert status == 200 and body["ok"]
+    assert body["deleted"]["sessions"] >= 1
+    assert body["deleted"]["cachedSpend"] >= 1
+    assert deleted_topics, "the per-user SNS topic should be removed"
+    # It must be honest that the role in the user's own account is not ours to delete.
+    assert "CloudFormation" in body["note"]
+
+    # The session no longer works, and the account is gone.
+    assert call("GET /me", token=session)[0] == 401
+    users = users_table()
+    assert "Item" not in users.get_item(Key={"pk": f"email#{sha(OWNER)}"})
+    leftover = users.scan(FilterExpression="begins_with(pk, :p)", ExpressionAttributeValues={":p": "user#"})["Items"]
+    assert leftover == []
+    cached = cache_table().scan()["Items"]
+    assert cached == []
+    assert boto3  # imported for clarity about which mocks are in play
+
+
+def test_delete_account_needs_a_session(aws):
+    assert call("POST /account/delete", {})[0] == 401
+
+
+def test_delete_survives_sns_failing(session, monkeypatch):
+    import settings_handler
+
+    def boom(arn):
+        raise RuntimeError("SNS is having a day")
+
+    monkeypatch.setattr(settings_handler.notify, "delete_topic", boom)
+    status, body = call("POST /account/delete", token=session)
+    assert status == 200 and body["deleted"]["emailTopic"] is False
+    assert call("GET /me", token=session)[0] == 401  # the data is still gone

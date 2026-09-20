@@ -60,7 +60,7 @@ async function getFx(force) {
   return cached ? { fx: cached, stale: true } : { fx: null, stale: true };
 }
 
-var API_PATHS = /^\/(auth\/(start|verify|signout)|me|spend|settings|connect|email-summary)(\?refresh=1)?$/;
+var API_PATHS = /^\/(auth\/(start|verify|signout)|account\/delete|me|spend|settings|connect|email-summary)(\?refresh=1)?$/;
 
 async function callApi(method, path, body) {
   var base = ((self.PAISA_CONFIG && self.PAISA_CONFIG.apiUrl) || "").replace(/\/$/, "");
@@ -86,7 +86,9 @@ async function callApi(method, path, body) {
       await chrome.storage.local.set({ session: { token: data.token, email: data.email } });
       return { ok: true, status: res.status, data: { email: data.email } }; // the panel never needs the token
     }
-    if (path === "/auth/signout") await chrome.storage.local.remove(["session", "lastBill"]);
+    if (path === "/auth/signout" || path === "/account/delete") {
+      await chrome.storage.local.remove(["session", "lastBill"]);
+    }
     return { ok: true, status: res.status, data: data };
   }
   if (res.status === 401 && path !== "/auth/verify") await chrome.storage.local.remove(["session", "lastBill"]);

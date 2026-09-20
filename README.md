@@ -35,7 +35,7 @@ No AWS credentials ever live in the browser, the dashboard or the extension. The
 | `web/` | Next.js (App Router, Tailwind) dashboard, deployable on Vercel |
 | `extension/` | Manifest V3 extension for Edge and Chrome (console badge) |
 | `onboarding/` | CloudFormation template the user installs to grant read-only cost access |
-| `docs/` | `architecture.md` (how it fits together) and `demo.md` (the recording plan) |
+| `docs/` | `architecture.md` (how it fits together), `demo.md` (the recording plan), `store-listing.md` (publishing it) |
 
 ## Status
 
@@ -62,9 +62,9 @@ npm run dev
 ## Tests
 
 ```
-python -m pytest backend/tests     # 76 tests: conversion maths, auth, caching,
+python -m pytest backend/tests     # 79 tests: conversion maths, auth, caching,
                                    # spend sources, emails, API routes (moto, no AWS)
-python tests/e2e/run.py            # 5 browser suites (107 checks) driving the real extension
+python tests/e2e/run.py            # 5 browser suites (114 checks) driving the real extension
 cd web && npm run lint && npm run build
 ```
 
@@ -86,6 +86,7 @@ that has not finished signup, and a ready account.
 | POST | `/connect` | `{ roleArn }` (Bearer token) | `{ ok: true }` after a test AssumeRole and a 1-day Cost Explorer call |
 | GET | `/spend` | Bearer token | see `web/lib/types.ts` `SpendResponse` |
 | PUT | `/settings` | `{ entity, markup_pct, gst_pct }` | `{ ok: true }` |
+| POST | `/account/delete` | Bearer token | erases everything Paisa holds about the user |
 
 ## Extension (Edge and Chrome)
 

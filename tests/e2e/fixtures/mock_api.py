@@ -20,6 +20,7 @@ DEFAULT_SETTINGS = {"entity": "AWS_INC", "markup_pct": 0.035, "gst_pct": 0.18, "
 SETTINGS = {}  # per-email, so a settings change is observable
 STARTS = {}
 CONNECTED = set()
+DELETED = set()
 LOG = []
 ROLE_ARN = re.compile(r"^arn:aws:iam::\d{12}:role/[\w+=,.@/-]{1,200}$")
 
@@ -126,6 +127,19 @@ class H(BaseHTTPRequestHandler):
                 return self._send(400, {"error": "Paisa couldn't assume that role. Check its trust policy."})
             CONNECTED.add(email)
             return self._send(200, {"ok": True, "connected": True})
+        if path == "/account/delete":
+            email = self._email()
+            if not email:
+                return self._send(401, {"error": "Sign in to continue."})
+            CONNECTED.discard(email)
+            SETTINGS.pop(email, None)
+            STARTS.pop(email, None)
+            DELETED.add(email)
+            return self._send(200, {
+                "ok": True,
+                "deleted": {"sessions": 1, "cachedSpend": 1, "emailTopic": True},
+                "note": "The read-only role still exists in your AWS account. Delete the PaisaReadOnly CloudFormation stack to remove it.",
+            })
         if path == "/auth/signout":
             return self._send(200, {"ok": True})
         self._send(404, {"error": "Not found."})

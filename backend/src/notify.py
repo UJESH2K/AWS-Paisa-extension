@@ -26,6 +26,12 @@ def is_confirmed(topic_arn, email):
     return False
 
 
+def delete_topic(topic_arn):
+    """Removing the topic also removes its subscription, so we stop being able
+    to email the address at all."""
+    _sns().delete_topic(TopicArn=topic_arn)
+
+
 def publish(topic_arn, subject, message):
     # SNS subjects must be ASCII, single line, <= 100 chars.
     subject = subject.encode("ascii", "replace").decode("ascii").replace("\n", " ")[:100]

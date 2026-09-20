@@ -1,9 +1,10 @@
-"""User settings (assumptions and alert preferences) and the connect-a-role flow."""
+"""User settings, the connect-a-role flow, and account deletion."""
 import re
 from datetime import datetime, timedelta, timezone
 
 import ce
-from common import HttpError, to_ddb, user_settings, users_table
+import notify
+from common import HttpError, cache_table, sha, to_ddb, user_settings, users_table
 from convert import ENTITIES
 
 ROLE_ARN_RE = re.compile(r"^arn:aws:iam::\d{12}:role/[\w+=,.@/-]{1,200}\Z")
@@ -59,3 +60,43 @@ def connect_role(user, body, now=None):
         ExpressionAttributeValues={":r": role_arn},
     )
     return {"ok": True, "connected": True}
+
+
+def _delete_matching(table, prefix, extra=None, values=None):
+    """Delete every item whose pk starts with prefix. Scans, which is fine at
+    this size and keeps the table free of secondary indexes."""
+    expr = "begins_with(pk, :p)" + (f" AND {extra}" if extra else "")
+    kwargs = {"FilterExpression": expr, "ExpressionAttributeValues": {":p": prefix, **(values or {})}}
+    removed = 0
+    while True:
+        resp = table.scan(**kwargs)
+        for item in resp.get("Items", []):
+            table.delete_item(Key={"pk": item["pk"]})
+            removed += 1
+        if "LastEvaluatedKey" not in resp:
+            return removed
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+
+
+def delete_account(user):
+    """Erase everything Paisa holds about this user.
+
+    Deliberately leaves the role in the user's own AWS account alone: it is
+    theirs, we cannot delete it, and saying so is better than implying we did.
+    """
+    users = users_table()
+    user_id = user["pk"].split("#", 1)[1]
+    tokens = _delete_matching(users, "tok#", "userId = :u", {":u": user_id})
+    cached = _delete_matching(cache_table(), f"spend#{user.get('roleArn') or 'self'}#")
+    for key in (f"code#{user_id}", f"thr#{sha(user['email'])}", f"email#{sha(user['email'])}", user["pk"]):
+        users.delete_item(Key={"pk": key})
+    topic_gone = True
+    try:
+        notify.delete_topic(user["topicArn"])
+    except Exception:  # the account is still gone; the topic is not worth failing over
+        topic_gone = False
+    return {
+        "ok": True,
+        "deleted": {"sessions": tokens, "cachedSpend": cached, "emailTopic": topic_gone},
+        "note": "The read-only role still exists in your AWS account. Delete the PaisaReadOnly CloudFormation stack to remove it.",
+    }

@@ -55,7 +55,7 @@ Resources:
         - Statement:
             - Sid: PerUserTopics
               Effect: Allow
-              Action: [sns:CreateTopic, sns:Subscribe, sns:Publish, sns:ListSubscriptionsByTopic]
+              Action: [sns:CreateTopic, sns:Subscribe, sns:Publish, sns:ListSubscriptionsByTopic, sns:DeleteTopic]
               Resource: !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:paisa-*
             - Sid: ReadCosts
               Effect: Allow

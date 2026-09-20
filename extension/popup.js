@@ -345,7 +345,19 @@
     });
   }
 
+  function renderAccount() {
+    var signedIn = !!st.session;
+    $("acctSec").hidden = !signedIn;
+    if (!signedIn) {
+      $("deleteConfirm").hidden = true;
+      note("acctMsg", true, "");
+      return;
+    }
+    $("acctNote").textContent = "Signed in as " + st.session.email + ". Your assumptions and cached spend are stored against this email.";
+  }
+
   function render() {
+    renderAccount();
     renderBill();
     renderAuth();
     renderHero();
@@ -396,6 +408,34 @@
     $("authGo").addEventListener("click", authGo);
     $("authBack").addEventListener("click", function () { st.authStage = "email"; note("authMsg", false, ""); render(); });
     $("authCode").addEventListener("keydown", function (e) { if (e.key === "Enter") authGo(); });
+    $("signOut").addEventListener("click", function () {
+      api("POST", "/auth/signout", null).then(function () {
+        st.session = null;
+        st.bill = null;
+        st.authStage = "email";
+        render();
+      });
+    });
+    $("deleteAcct").addEventListener("click", function () { $("deleteConfirm").hidden = false; });
+    $("deleteNo").addEventListener("click", function () { $("deleteConfirm").hidden = true; });
+    $("deleteYes").addEventListener("click", function () {
+      $("deleteYes").disabled = true;
+      api("POST", "/account/delete", null).then(function (r) {
+        $("deleteYes").disabled = false;
+        if (!r.ok) return note("acctMsg", false, r.error);
+        // Nothing of theirs should survive locally either.
+        chrome.storage.local.remove(["session", "lastBill", "history"], function () {
+          st.session = null;
+          st.bill = null;
+          st.history = [];
+          st.authStage = "email";
+          $("deleteConfirm").hidden = true;
+          render();
+          note("acctMsg", true, "Deleted. " + (r.data.note || ""));
+          $("acctSec").hidden = false;
+        });
+      });
+    });
     $("authEmail").addEventListener("keydown", function (e) { if (e.key === "Enter") authGo(); });
   }
 

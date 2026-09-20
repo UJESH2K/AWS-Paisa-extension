@@ -76,6 +76,8 @@ def handler(event, context):
             return ok(settings_handler.connect_role(user, body))
         if route == "POST /email-summary":
             return ok(email_handler.send_summary(user, "projection"))
+        if route == "POST /account/delete":
+            return ok(settings_handler.delete_account(user))
         if route == "POST /auth/signout":
             return ok(auth_handler.sign_out(headers))
         return err(404, "Not found.")

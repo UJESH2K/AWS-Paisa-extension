@@ -122,6 +122,26 @@
       <ul id="history"></ul>
     </section>
 
+    <section id="acctSec" hidden>
+      <h2>Your Paisa account</h2>
+      <p class="note" id="acctNote">Signed in. Your assumptions and your cached spend are stored against this email.</p>
+      <div class="actions">
+        <button id="signOut" type="button" class="btn">Sign out</button>
+        <button id="deleteAcct" type="button" class="btn">Delete my data</button>
+      </div>
+      <div id="deleteConfirm" hidden>
+        <p class="msg err" role="alert">
+          This erases your email, settings, sessions and cached spend from Paisa. It cannot be undone. The read-only
+          role stays in your AWS account until you delete its CloudFormation stack.
+        </p>
+        <div class="actions">
+          <button id="deleteYes" type="button" class="btn primary">Yes, delete everything</button>
+          <button id="deleteNo" type="button" class="btn">Cancel</button>
+        </div>
+      </div>
+      <p class="msg" id="acctMsg" hidden></p>
+    </section>
+
     <footer>
       <span id="who"></span>
       Estimates only. Your bank's rate on the settlement date and your AWS entity decide the real figure.
