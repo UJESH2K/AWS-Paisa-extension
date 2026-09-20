@@ -35,6 +35,8 @@ export async function launch({ extDir, port, profileTag = "paisa" }) {
     [
       "--headless=new",
       "--disable-gpu",
+      // CI containers run as root, where Chrome refuses to start sandboxed.
+      ...(process.platform === "win32" ? [] : ["--no-sandbox", "--disable-dev-shm-usage"]),
       `--remote-debugging-port=${port}`,
       `--user-data-dir=${path.join(process.env.TEMP || "/tmp", `${profileTag}-${Date.now()}`)}`,
       `--load-extension=${extDir}`,

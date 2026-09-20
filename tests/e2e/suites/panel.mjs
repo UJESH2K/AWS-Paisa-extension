@@ -172,6 +172,19 @@ try {
     true,
   );
 
+  // ---- a server that accepts the connection and never answers ----
+  await setStorage({ session: { token: "tok-owner@example.com", email: "owner@example.com" } });
+  await fetch(`${API}/_hang`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ on: true }) });
+  const stuck = await openPage(PORT, `${SITE}/home.html`);
+  const sd = panelDriver(stuck);
+  await stuck.waitFor(`!!${PANEL_HOST}`);
+  await sd.open();
+  c.check("a hung server produces an error, not an endless spinner", await sd.has("took too long", 12000), true);
+  c.check("and offers a way back", await sd.text(), (s) => s.includes("Try again"));
+  await fetch(`${API}/_hang`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ on: false }) });
+  await sd.click("Try again");
+  c.check("retrying after it recovers works", await sd.has("Expected bill this month", 12000), true);
+
   // ---- the panel and the inline badges must not interfere ----
   await setStorage({ session: { token: "tok-owner@example.com", email: "owner@example.com" } });
   const billing = await openPage(PORT, `${SITE}/billing.html`);
@@ -185,7 +198,7 @@ try {
   c.check("and the scanner never badges the panel itself", await billing.ev(`${PANEL_SHADOW}.querySelectorAll('[data-paisa]').length`), 0);
   if (shotDir) await billing.screenshot(`${shotDir}/panel-over-billing.png`);
 
-  const errors = [...page.errors, ...ext.errors, ...billing.errors];
+  const errors = [...page.errors, ...ext.errors, ...stuck.errors, ...billing.errors];
   c.check("no console errors", errors.length, 0);
   if (errors.length) console.log(errors);
 } finally {

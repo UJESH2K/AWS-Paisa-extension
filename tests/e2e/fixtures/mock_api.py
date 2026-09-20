@@ -3,6 +3,7 @@ report code so the shape matches production exactly."""
 import json
 import re
 import sys
+import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -21,6 +22,7 @@ SETTINGS = {}  # per-email, so a settings change is observable
 STARTS = {}
 CONNECTED = set()
 DELETED = set()
+HANG = {"on": False}
 LOG = []
 ROLE_ARN = re.compile(r"^arn:aws:iam::\d{12}:role/[\w+=,.@/-]{1,200}$")
 
@@ -75,6 +77,9 @@ class H(BaseHTTPRequestHandler):
                 "settings": self._settings(email),
             })
         if path == "/spend":
+            if HANG["on"]:
+                time.sleep(30)  # accept the connection, never answer
+                return
             email = self._email()
             if not email:
                 return self._send(401, {"error": "Sign in to continue."})
@@ -127,6 +132,9 @@ class H(BaseHTTPRequestHandler):
                 return self._send(400, {"error": "Paisa couldn't assume that role. Check its trust policy."})
             CONNECTED.add(email)
             return self._send(200, {"ok": True, "connected": True})
+        if path == "/_hang":
+            HANG["on"] = bool(body.get("on"))
+            return self._send(200, {"ok": True, "hanging": HANG["on"]})
         if path == "/account/delete":
             email = self._email()
             if not email:

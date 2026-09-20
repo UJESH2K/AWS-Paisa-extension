@@ -64,7 +64,7 @@ npm run dev
 ```
 python -m pytest backend/tests     # 79 tests: conversion maths, auth, caching,
                                    # spend sources, emails, API routes (moto, no AWS)
-python tests/e2e/run.py            # 5 browser suites (114 checks) driving the real extension
+python tests/e2e/run.py            # 5 browser suites (117 checks) driving the real extension
 cd web && npm run lint && npm run build
 ```
 

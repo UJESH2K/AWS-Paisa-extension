@@ -52,6 +52,8 @@ def build_extension_copies():
                 f'  apiUrl: "{api_url}",\n'
                 '  region: "ap-south-1",\n'
                 '  roleTemplateUrl: "https://example-bucket.s3.amazonaws.com/role-template.yaml",\n'
+                # Short, so the timeout suite does not sit for the production 15s.
+                '  apiTimeoutMs: 1500,\n'
                 "};\n",
                 encoding="utf-8",
             )

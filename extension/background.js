@@ -69,11 +69,29 @@ async function callApi(method, path, body) {
   var stored = await chrome.storage.local.get({ session: null });
   var headers = { "Content-Type": "application/json" };
   if (stored.session && stored.session.token) headers.Authorization = "Bearer " + stored.session.token;
+  // A server that accepts the connection and then never answers would leave the
+  // panel spinning indefinitely, so every request gets a deadline.
+  var controller = new AbortController();
+  var timeout = (self.PAISA_CONFIG && self.PAISA_CONFIG.apiTimeoutMs) || 15000;
+  var timer = setTimeout(function () { controller.abort(); }, timeout);
   var res;
   try {
-    res = await fetch(base + path, { method: method, headers: headers, body: body ? JSON.stringify(body) : undefined });
+    res = await fetch(base + path, {
+      method: method,
+      headers: headers,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
   } catch (e) {
-    return { ok: false, status: 0, error: "Couldn't reach the Paisa server. Check your connection and try again." };
+    return {
+      ok: false,
+      status: 0,
+      error: e && e.name === "AbortError"
+        ? "The Paisa server took too long to answer. Try again in a moment."
+        : "Couldn't reach the Paisa server. Check your connection and try again.",
+    };
+  } finally {
+    clearTimeout(timer);
   }
   var data = null;
   try {

@@ -1,0 +1,86 @@
+name: CI
+
+# Every layer runs on a clean machine, with no AWS account and no credentials:
+# the backend tests use moto, and the browser suites drive the real unpacked
+# extension against local fixtures.
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r backend/requirements-dev.txt
+      - run: python -m pytest backend/tests -q
+
+  template:
+    name: Infrastructure templates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install cfn-lint
+      - name: The role users install must be valid
+        run: cfn-lint onboarding/role-template.yaml
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+      - name: The SAM stack must be valid
+        # --lint only parses the template; it needs a region but no credentials.
+        run: sam validate --lint --region ap-south-1
+        working-directory: backend
+
+  web:
+    name: Dashboard
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  e2e:
+    name: Browser suites
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: browser-actions/setup-chrome@v1
+        id: chrome
+        with:
+          chrome-version: stable
+      - name: Run the suites against the real unpacked extension
+        env:
+          PAISA_BROWSER: ${{ steps.chrome.outputs.chrome-path }}
+        run: python tests/e2e/run.py
+      - name: Keep the screenshots when something fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: tests/e2e/.work/screenshots/
+          if-no-files-found: ignore

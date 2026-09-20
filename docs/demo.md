@@ -143,5 +143,11 @@ Screenshots land in `tests/e2e/.work/screenshots/` and are useful for the README
 - [ ] Watch it once at full length without touching anything.
 - [ ] Check every claim you made out loud is true. If one is not, re-record that beat.
 - [ ] Upload unlisted, then **open the link in a signed-out browser** before pasting it anywhere.
+- [ ] **Publish the repo.** It has no remote yet, so this has not happened:
+      ```bash
+      gh auth login
+      gh repo create paisa --public --source . --remote origin --push
+      ```
+      Then check CI goes green on GitHub (`.github/workflows/ci.yml` runs all four layers).
 - [ ] Submission checklist: repo public, commit history inside the event dates, each teammate registered individually, team leader's Builder Center profile verified.
 - [ ] `WRITEUP.md` has two sections marked for you — what each of you learned, and which AI tools each of you used. Fill them in before submitting; they are explicitly asked for.
