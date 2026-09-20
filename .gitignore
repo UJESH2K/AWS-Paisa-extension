@@ -27,3 +27,9 @@ Thumbs.db
 
 # e2e scratch build
 tests/e2e/.work/
+
+# Packing an extension in Edge/Chrome produces these next to the source.
+# ext.pem is a PRIVATE SIGNING KEY: never commit it, never share it.
+dist/
+*.crx
+*.pem
