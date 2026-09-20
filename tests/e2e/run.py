@@ -11,6 +11,7 @@ No AWS account and no network access to AWS are involved.
 """
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -196,7 +197,28 @@ def start_api_server():
     return proc
 
 
+def write_summary(results):
+    """Record suite and check totals, so scripts/check_docs.py can verify what
+    the docs claim instead of anyone having to remember to update them."""
+    counts = {}
+    for name in results:
+        log = WORK / "logs" / f"{name}.log"
+        if log.exists():
+            body = log.read_text(encoding="utf-8", errors="replace")
+            counts[name] = len(re.findall(r"^(?:PASS|FAIL)  ", body, re.M))
+    payload = {"suites": len(results), "checks": sum(counts.values()) or None, "perSuite": counts}
+    (WORK / "summary.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
 def main():
+    # The suites print rupee signs and "≈". On Windows the console defaults to
+    # cp1252, which cannot encode them, so relaying captured output would raise.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
     args = sys.argv[1:]
     from_zip = "--from-zip" in args
     wanted = [a for a in args if not a.startswith("--")] or list(SUITES)
@@ -235,7 +257,12 @@ def main():
                 cmd.append(mode)
             api = start_api_server()  # a clean API per suite
             try:
-                results[name] = subprocess.run(cmd, cwd=ROOT).returncode == 0
+                (WORK / "logs").mkdir(parents=True, exist_ok=True)
+                done = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
+                sys.stdout.write(done.stdout)
+                sys.stderr.write(done.stderr)
+                (WORK / "logs" / f"{name}.log").write_text(done.stdout, encoding="utf-8")
+                results[name] = done.returncode == 0
             finally:
                 api.terminate()
                 api.wait(timeout=10)
@@ -246,6 +273,7 @@ def main():
             site.terminate()
 
     print(f"\n{'=' * 60}")
+    write_summary(results)
     for name, ok in results.items():
         print(f"  {'PASS' if ok else 'FAIL'}  {name}")
     failed = [n for n, ok in results.items() if not ok]

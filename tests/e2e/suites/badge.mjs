@@ -10,7 +10,9 @@ const { proc, extensionId } = await launch({ extDir, port: PORT, profileTag: "pa
 
 try {
   const page = await openPage(PORT, `${SITE}/billing.html`);
-  c.check("a badge is injected on the billing page", await page.waitFor("!!document.querySelector('.paisa-badge')"), true);
+  // The very first badge waits on the service worker starting and fetching a
+  // rate, which on a cold profile can outrun the default timeout.
+  c.check("a badge is injected on the billing page", await page.waitFor("!!document.querySelector('.paisa-badge')", 20000), true);
   await sleep(800);
 
   const found = await page.ev(`({

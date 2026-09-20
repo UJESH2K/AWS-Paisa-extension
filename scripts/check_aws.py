@@ -7,7 +7,9 @@ owns the `aws login` device-flow session; boto3 cannot always read it and fails
 with MissingDependencyException, which is a tooling problem and not an account
 problem.
 
-  NO_CREDENTIALS  nothing configured at all
+  CLI_MISSING     the AWS CLI is not on this shell's PATH (say so, rather than
+                  blaming credentials: on Windows a new shell may not have it)
+  NO_CREDENTIALS  the CLI works but nothing is configured
   EXPIRED         `aws login` session has lapsed; the user must sign in again
   NOT_ACTIVATED   credentials fine, but the account has not finished signup, so
                   deployable services answer OptInRequired / NotSignedUp
@@ -68,7 +70,15 @@ def run(args, region):
 
 def status():
     if not shutil.which("aws"):
-        return {"status": "NO_CREDENTIALS", "detail": "The AWS CLI is not installed or not on PATH.", "checks": {}}
+        return {
+            "status": "CLI_MISSING",
+            "detail": (
+                "The AWS CLI is not on this shell's PATH. It may still be installed — on Windows, "
+                "a shell started before the install will not see it. Try a new terminal, or run "
+                "this from PowerShell."
+            ),
+            "checks": {},
+        }
 
     checks = {}
     _, sts_args, sts_region = PROBES[0]

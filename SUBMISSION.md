@@ -13,7 +13,7 @@ Everything that could be built and verified without you has been. What remains n
 | Extension (button, panel, badges, popup) | Built. `dist/paisa-extension-0.6.0.zip` |
 | Backend (API, auth, spend, emails, schedules) | Written, tested, template validates. **Not deployed** |
 | Dashboard (`web/`) | Built and tested. **Not deployed** |
-| Tests | 101 backend (98% coverage), 138 browser checks across 6 suites. All green locally |
+| Tests | 101 backend (98% coverage), 142 browser checks across 6 suites. All green locally |
 | CI | Written. **Never run** — the repo has no remote yet |
 | Repo | 21 commits, dated inside the event window. **Not published** |
 | Video | **Not recorded** |
@@ -109,7 +109,7 @@ Do 1, 3 (Script A), 4, 5, 6. The deployment is the only thing Script A gives up,
 
 ```bash
 python -m pytest backend/tests -q --cov=backend/src   # 101 tests, 98% coverage
-python tests/e2e/run.py                               # 6 suites, 138 checks
+python tests/e2e/run.py                               # 6 browser suites (142 checks)
 python tests/e2e/run.py --from-zip                    # the same, against the shipped zip
 python scripts/check_aws.py                           # can this machine deploy?
 ```

@@ -76,6 +76,10 @@ They cover 98% of `backend/src`, and CI fails below 95%. Add `--cov=backend/src
 --cov-report=term-missing` to see the gaps.
 The browser suites need Node and Edge or Chrome; see `tests/e2e/README.md`.
 
+`python scripts/check_docs.py` checks that the figures in these docs match the
+repo — test counts and versions drift, and `docs/demo.md` tells someone what to
+say on camera.
+
 `python scripts/check_aws.py` reports whether this machine can deploy at all,
 telling apart missing credentials, an expired `aws login` session, an account
 that has not finished signup, and a ready account.
