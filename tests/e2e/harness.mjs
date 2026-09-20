@@ -160,6 +160,17 @@ export const inr0 = (n) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
 export const inr2 = (n) => new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 export const usd = (n) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+
+/** Pull the rupee amount out of a rendered string, for comparing money that
+ *  the extension and the test reached by different arithmetic. Two correct
+ *  routes to the same figure can round to different paise, so assert
+ *  closeness rather than string equality. */
+export function parseInr(text) {
+  const m = /₹\s*([\d,]+(?:\.\d+)?)/.exec(String(text || ""));
+  return m ? Number(m[1].replace(/,/g, "")) : NaN;
+}
+export const near = (expected, tolerance = 0.02) => (actual) =>
+  Math.abs(parseInr(actual) - expected) <= tolerance;
 export { sleep };
 
 /** The panel lives in a shadow root; suites address it through this. */

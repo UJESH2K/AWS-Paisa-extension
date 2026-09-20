@@ -1,7 +1,8 @@
 """Run the browser end-to-end suites.
 
-    python tests/e2e/run.py            # all suites
-    python tests/e2e/run.py theme      # one suite
+    python tests/e2e/run.py              # all suites, against extension/
+    python tests/e2e/run.py theme        # one suite
+    python tests/e2e/run.py --from-zip   # against the packaged dist/ zip instead
 
 Builds throwaway copies of extension/ whose manifests point at local fixture
 pages instead of console.aws.amazon.com, serves those pages, starts a stand-in
@@ -14,6 +15,7 @@ import socket
 import subprocess
 import sys
 import time
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -31,14 +33,49 @@ SUITES = {
 }
 
 
-def build_extension_copies():
-    """Copy extension/ and repoint the manifest at the local fixture server."""
+def unpack_shipped_zip():
+    """Extract the newest dist zip — the artifact users actually install.
+
+    Testing extension/ proves the source works; it does not prove the package
+    does. A file missing from the zip would leave every suite green and the
+    shipped product broken.
+    """
+    zips = sorted((ROOT / "dist").glob("paisa-extension-*.zip"))
+    if not zips:
+        raise SystemExit("No dist/paisa-extension-*.zip. Run: python scripts/package_extension.py")
+    newest = zips[-1]
+    unpacked = WORK / "from-zip"
+    if unpacked.exists():
+        shutil.rmtree(unpacked)
+    unpacked.mkdir(parents=True)
+    with zipfile.ZipFile(newest) as z:
+        names = z.namelist()
+        if "manifest.json" not in names:
+            raise SystemExit(f"{newest.name} has no manifest.json at its root.")
+        z.extractall(unpacked)
+
+    # Every file the source ships must be in the package.
+    source_files = {
+        p.relative_to(ROOT / "extension").as_posix()
+        for p in (ROOT / "extension").rglob("*")
+        if p.is_file() and not p.name.startswith(".")
+    }
+    missing = source_files - set(names)
+    if missing:
+        raise SystemExit(f"{newest.name} is missing: {', '.join(sorted(missing))}")
+    print(f"Testing the packaged artifact: {newest.name} ({len(names)} files)")
+    return unpacked
+
+
+def build_extension_copies(source=None):
+    """Copy the extension and repoint the manifest at the local fixture server."""
+    source = source or (ROOT / "extension")
     WORK.mkdir(parents=True, exist_ok=True)
     for name, api_url in (("ext-panel", f"http://localhost:{API_PORT}"), ("ext-noapi", "")):
         dest = WORK / name
         if dest.exists():
             shutil.rmtree(dest)
-        shutil.copytree(ROOT / "extension", dest)
+        shutil.copytree(source, dest)
         manifest = json.loads((dest / "manifest.json").read_text(encoding="utf-8"))
         # Both scripts cover every console page in the real manifest; the badge
         # scanner decides for itself whether a page is about money.
@@ -54,6 +91,9 @@ def build_extension_copies():
                 '  roleTemplateUrl: "https://example-bucket.s3.amazonaws.com/role-template.yaml",\n'
                 # Short, so the timeout suite does not sit for the production 15s.
                 '  apiTimeoutMs: 1500,\n'
+                # A local rate, so the suites never depend on a third-party FX
+                # API being reachable or un-throttled.
+                f'  fxUrl: "http://localhost:{SITE_PORT}/fx.json",\n'
                 "};\n",
                 encoding="utf-8",
             )
@@ -117,7 +157,9 @@ def start_api_server():
 
 
 def main():
-    wanted = sys.argv[1:] or list(SUITES)
+    args = sys.argv[1:]
+    from_zip = "--from-zip" in args
+    wanted = [a for a in args if not a.startswith("--")] or list(SUITES)
     unknown = [w for w in wanted if w not in SUITES]
     if unknown:
         raise SystemExit(f"Unknown suite(s): {', '.join(unknown)}. Available: {', '.join(SUITES)}")
@@ -125,7 +167,7 @@ def main():
     if not shutil.which("node"):
         raise SystemExit("node is required to run the browser suites.")
 
-    build_extension_copies()
+    build_extension_copies(unpack_shipped_zip() if from_zip else None)
     site = start_site_server()
     results = {}
     try:

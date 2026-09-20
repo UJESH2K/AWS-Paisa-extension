@@ -77,6 +77,12 @@ jobs:
         env:
           PAISA_BROWSER: ${{ steps.chrome.outputs.chrome-path }}
         run: python tests/e2e/run.py
+      - name: And against the packaged zip users actually install
+        env:
+          PAISA_BROWSER: ${{ steps.chrome.outputs.chrome-path }}
+        run: |
+          python scripts/package_extension.py
+          python tests/e2e/run.py --from-zip
       - name: Keep the screenshots when something fails
         if: failure()
         uses: actions/upload-artifact@v4

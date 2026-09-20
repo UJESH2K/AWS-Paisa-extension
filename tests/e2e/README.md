@@ -7,13 +7,18 @@ No AWS account, credentials, or network access to AWS is involved. The suites ru
 ## Running
 
 ```bash
-python tests/e2e/run.py            # all suites
-python tests/e2e/run.py theme      # one suite
+python tests/e2e/run.py              # all suites, against extension/
+python tests/e2e/run.py theme        # one suite
+python tests/e2e/run.py --from-zip   # against the packaged dist/ zip instead
 ```
+
+`--from-zip` tests the artifact users actually install, and fails if the package is missing any file the source ships. Testing `extension/` proves the source works; it does not prove the package does.
 
 The runner copies `extension/` into `tests/e2e/.work/`, repoints the manifest at `localhost` instead of `console.aws.amazon.com`, starts the local servers, runs each suite, and tears everything down. Exit code is non-zero if any suite fails.
 
 The stand-in API accumulates state (sessions, settings, connected roles), so **each suite gets its own instance**. Sharing one made results depend on the order suites ran in: the popup suite passed alone and failed in a full run, because an earlier suite had already signed the same address in. Suites are verified to pass in reverse order too.
+
+The suites are hermetic: the exchange rate comes from a local fixture via the build's `fxUrl`, not from a third-party API, so a throttled or unreachable FX service cannot fail the run.
 
 Set `PAISA_BROWSER` if Edge/Chrome is not in a standard location.
 
@@ -30,7 +35,7 @@ Set `PAISA_BROWSER` if Edge/Chrome is not in a standard location.
 ## Notes for anyone extending these
 
 - **Derive expected values, don't hard-code them.** The suites read the FX rate the extension actually fetched and compute the expected rupee figure from it.
-- **Use the `inr0`/`inr2` helpers for comparisons.** Node and the browser can disagree on currency spacing across ICU versions; comparing against hand-written literals produces fake failures.
+- **Use the `inr0` helper for comparisons, and `near()` for money the extension computed by a different route.** Node and the browser can disagree on currency spacing across ICU versions, and two correct paths to the same figure can round to different paise — `5 × 90 × 1.035 × 1.18` and `(52.30 − 47.30) × 90 × 1.2213` differ in the last digit. Comparing rendered money strings for exact equality produces failures that look like product bugs and are not.
 - **Headings are uppercased by CSS**, so `panelDriver.has()` compares case-insensitively.
 - The panel lives in a shadow root; reach it via `PANEL_SHADOW`, not `document.querySelector`.
 - A content script runs in an isolated world, so patching `window.open` from `Runtime.evaluate` cannot observe it. Assert on the DOM the extension produced instead.

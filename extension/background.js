@@ -31,14 +31,21 @@ function getCached() {
   });
 }
 
+function sources() {
+  var override = (self.PAISA_CONFIG && self.PAISA_CONFIG.fxUrl) || "";
+  if (!override) return SOURCES;
+  return [{ name: "configured source", url: override, parse: SOURCES[0].parse }];
+}
+
 async function fetchFresh() {
-  for (var i = 0; i < SOURCES.length; i++) {
+  var list = sources();
+  for (var i = 0; i < list.length; i++) {
     try {
-      var res = await fetch(SOURCES[i].url, { cache: "no-store" });
+      var res = await fetch(list[i].url, { cache: "no-store" });
       if (!res.ok) continue;
-      var p = SOURCES[i].parse(await res.json());
+      var p = list[i].parse(await res.json());
       if (typeof p.rate === "number" && p.rate > 0) {
-        var fx = { rate: p.rate, asOf: p.asOf, fetchedAt: new Date().toISOString(), source: SOURCES[i].name };
+        var fx = { rate: p.rate, asOf: p.asOf, fetchedAt: new Date().toISOString(), source: list[i].name };
         await chrome.storage.local.set({ fx: fx });
         return fx;
       }

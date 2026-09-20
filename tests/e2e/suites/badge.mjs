@@ -1,6 +1,6 @@
 // The inline rupee badges the content script injects next to dollar figures on
 // AWS billing pages, and the readings it records so changes can be shown.
-import { Checks, inr0, inr2, launch, openPage, sleep, usd } from "../harness.mjs";
+import { Checks, inr0, launch, near, openPage, parseInr, sleep, usd } from "../harness.mjs";
 
 const [extDir, shotDir] = process.argv.slice(2);
 const PORT = 9444;
@@ -39,6 +39,7 @@ try {
   const popup = await openPage(PORT, `chrome-extension://${extensionId}/popup.html`);
   await popup.waitFor("document.getElementById('fxRate').textContent.includes('₹')");
   const fx = await popup.ev("new Promise(r=>chrome.storage.local.get('fx',d=>r(d.fx)))");
+  c.check("the rate came from the local fixture, not a third-party API", fx.rate, 90);
   c.check("the badge equals USD x rate x markup x GST", found.primary, `≈ ${inr0(47.3 * fx.rate * 1.035 * 1.18)}`);
 
   // The console updates its figure in place; the badge must follow.
@@ -73,7 +74,7 @@ try {
   })`);
   const spendDelta = 5 * fx.rate * 1.035 * 1.18;
   c.check("the popup headline is the latest total", ui.hero, inr0(52.3 * fx.rate * 1.035 * 1.18));
-  c.check("it shows the increase", ui.change, (s) => s.startsWith(`▲ +₹${inr2(spendDelta)}`));
+  c.check("it shows the increase", ui.change, (s) => s.startsWith("▲ +₹") && near(spendDelta)(s));
   c.check(
     "and splits it into spend vs exchange rate",
     ui.split,
@@ -93,7 +94,7 @@ try {
   await popup2.ev(
     "(()=>{const e=document.getElementById('calcUsd');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,'100');e.dispatchEvent(new Event('input',{bubbles:true}));})()",
   );
-  c.check("the calculator uses the same maths", await popup2.ev("document.getElementById('calcOut').textContent"), `₹${inr2(100 * fx.rate * 1.18)}`);
+  c.check("the calculator uses the same maths", await popup2.ev("document.getElementById('calcOut').textContent"), near(100 * fx.rate * 1.18));
 
   await page.ev("document.querySelector('.paisa-badge').click()");
   await sleep(400);

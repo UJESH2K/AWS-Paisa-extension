@@ -2,7 +2,7 @@
 // It must show the same bill as the panel, and — the subtle part — its
 // settings must reach the server, so the badge on the page, the bill in the
 // panel and the emailed summary never disagree.
-import { Checks, inr0, inr2, launch, openPage, sleep, usd } from "../harness.mjs";
+import { Checks, inr0, launch, near, openPage, sleep, usd } from "../harness.mjs";
 
 const [extDir, shotDir] = process.argv.slice(2);
 const PORT = 9566;
@@ -30,7 +30,7 @@ try {
 
   const fx = await p1.ev("new Promise(r=>chrome.storage.local.get('fx',d=>r(d.fx)))");
   await type(p1, "calcUsd", "100");
-  c.check("the calculator works without signing in", await text(p1, "calcOut"), `₹${inr2(100 * fx.rate * 1.035 * 1.18)}`);
+  c.check("the calculator works without signing in", await text(p1, "calcOut"), near(100 * fx.rate * 1.035 * 1.18));
 
   // ---- signing in, from the popup itself ----
   await type(p1, "authEmail", "owner@example.com");
