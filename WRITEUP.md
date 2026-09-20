@@ -91,7 +91,7 @@ An extension is client-side code that anyone can unpack and read. Putting an acc
 Three layers, all runnable by anyone who clones the repo, none of which need an AWS account:
 
 - **79 backend tests** (`python -m pytest backend/tests`) using `moto`, so the real DynamoDB, SNS and CloudWatch code paths execute against mocked AWS. They cover the conversion maths for both entities, the login flow including code expiry and attempt limits, the caching guarantees, the source fallback, email content, and every API route including authorisation and error handling.
-- **5 browser suites, 118 checks** (`python tests/e2e/run.py`) that load the **real unpacked extension** into headless Edge and drive it over the DevTools protocol against fixture pages that stand in for the console.
+- **6 browser suites, 138 checks** (`python tests/e2e/run.py`) that load the **real unpacked extension** into headless Edge and drive it over the DevTools protocol against fixture pages that stand in for the console.
 - **Lint, typecheck and production build** for the Next.js dashboard.
 
 The conversion logic exists twice — `backend/src/convert.py` and `web/lib/convert.ts` — so the dashboard can recompute instantly when a user drags the GST slider. We verified the two produce identical output to the last decimal rather than assuming.

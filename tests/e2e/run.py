@@ -10,6 +10,7 @@ Paisa API, then drives the real unpacked extension in headless Edge/Chrome.
 No AWS account and no network access to AWS are involved.
 """
 import json
+import os
 import shutil
 import socket
 import subprocess
@@ -23,6 +24,7 @@ E2E = ROOT / "tests" / "e2e"
 WORK = E2E / ".work"
 SITE_PORT = 8765
 API_PORT = 8766
+WEB_PORT = 3100
 
 SUITES = {
     "badge": ("badge.mjs", "ext-panel"),
@@ -30,6 +32,8 @@ SUITES = {
     "panel-noapi": ("panel.mjs", "ext-noapi"),
     "popup": ("popup.mjs", "ext-panel"),
     "theme": ("theme.mjs", "ext-panel"),
+    # The dashboard needs no extension, but does need to be built and served.
+    "web": ("web.mjs", None),
 }
 
 
@@ -98,6 +102,42 @@ def build_extension_copies(source=None):
                 encoding="utf-8",
             )
     return WORK / "ext-panel", WORK / "ext-noapi"
+
+
+def build_and_serve_web():
+    """Build the dashboard against the stand-in API and serve it.
+
+    NEXT_PUBLIC_* values are inlined at build time, so the API URL has to be set
+    for the build, not just the run. Returns None (and says why) if the app has
+    not had its dependencies installed, so the rest of the suites still run.
+    """
+    web = ROOT / "web"
+    if not (web / "node_modules").exists():
+        print("Skipping: web/node_modules is missing. Run `npm ci` in web/ to include the dashboard suite.")
+        return None
+    env = {
+        **os.environ,
+        "NEXT_PUBLIC_API_URL": f"http://localhost:{API_PORT}",
+        "NEXT_PUBLIC_AWS_REGION": "ap-south-1",
+        "NEXT_PUBLIC_ROLE_TEMPLATE_URL": "https://example-bucket.s3.amazonaws.com/role-template.yaml",
+    }
+    npm = "npm.cmd" if os.name == "nt" else "npm"
+    print("Building the dashboard against the stand-in API…", flush=True)
+    built = subprocess.run([npm, "run", "build"], cwd=web, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    if built.returncode != 0:
+        print(built.stderr.decode(errors="replace")[-2000:])
+        raise SystemExit("The dashboard failed to build.")
+    proc = subprocess.Popen(
+        [npm, "run", "start", "--", "-p", str(WEB_PORT)],
+        cwd=web,
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if not wait_for_port(WEB_PORT, timeout=60):
+        proc.terminate()
+        raise SystemExit(f"The dashboard did not start on port {WEB_PORT}.")
+    return proc
 
 
 def port_is_free(port):
@@ -169,8 +209,18 @@ def main():
 
     build_extension_copies(unpack_shipped_zip() if from_zip else None)
     site = start_site_server()
+    web = None
     results = {}
     try:
+        if "web" in wanted:
+            web_api = start_api_server()  # the build needs nothing, but the app is served against it
+            try:
+                web = build_and_serve_web()
+            finally:
+                web_api.terminate()
+                web_api.wait(timeout=10)
+            if web is None:
+                wanted = [w for w in wanted if w != "web"]
         for name in wanted:
             script, ext = SUITES[name]
             print(f"\n{'=' * 60}\n{name}\n{'=' * 60}", flush=True)
@@ -178,7 +228,7 @@ def main():
             cmd = [
                 "node",
                 str(E2E / "suites" / script),
-                str(WORK / ext),
+                str(WORK / ext) if ext else "",
                 str(WORK / "screenshots" / name),
             ]
             if mode:
@@ -190,6 +240,8 @@ def main():
                 api.terminate()
                 api.wait(timeout=10)
     finally:
+        if web:
+            web.terminate()
         if site:
             site.terminate()
 

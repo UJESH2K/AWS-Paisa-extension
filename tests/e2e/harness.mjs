@@ -28,7 +28,8 @@ export function findBrowser() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** Starts a headless browser with the unpacked extension loaded. */
+/** Starts a headless browser, with the unpacked extension loaded if given one.
+ *  Omit extDir to test a plain web page (the dashboard). */
 export async function launch({ extDir, port, profileTag = "paisa" }) {
   const proc = spawn(
     findBrowser(),
@@ -39,14 +40,32 @@ export async function launch({ extDir, port, profileTag = "paisa" }) {
       ...(process.platform === "win32" ? [] : ["--no-sandbox", "--disable-dev-shm-usage"]),
       `--remote-debugging-port=${port}`,
       `--user-data-dir=${path.join(process.env.TEMP || "/tmp", `${profileTag}-${Date.now()}`)}`,
-      `--load-extension=${extDir}`,
-      `--disable-extensions-except=${extDir}`,
-      // Newer builds disable --load-extension unless this is set.
-      "--disable-features=DisableLoadExtensionCommandLineSwitch",
+      ...(extDir
+        ? [
+            `--load-extension=${extDir}`,
+            `--disable-extensions-except=${extDir}`,
+            // Newer builds disable --load-extension unless this is set.
+            "--disable-features=DisableLoadExtensionCommandLineSwitch",
+          ]
+        : []),
       "about:blank",
     ],
     { stdio: "ignore" },
   );
+
+  if (!extDir) {
+    // Nothing to wait for beyond the browser answering.
+    for (let i = 0; i < 60; i++) {
+      try {
+        await (await fetch(`http://127.0.0.1:${port}/json`)).json();
+        return { proc, port, extensionId: null };
+      } catch {
+        await sleep(300);
+      }
+    }
+    proc.kill();
+    throw new Error("The browser did not start.");
+  }
 
   const targets = async () => {
     try {

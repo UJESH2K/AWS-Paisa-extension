@@ -30,6 +30,7 @@ Set `PAISA_BROWSER` if Edge/Chrome is not in a standard location.
 | `panel` | The ₹ Bill button and panel: email sign-in, the bill and its breakdown, emailing a summary, refresh, persistence across reloads, sign-out, stale sessions, and an account with no connected role |
 | `popup` | The toolbar popup: the same bill as the panel, signing in from the popup, and the settings-sync guarantee — a change there reaches the server, so the page badges, the panel and the emailed summary never disagree |
 | `panel-noapi` | A build with no API URL: it must say so plainly and offer a clearly labelled sample, not a sign-in form that cannot work |
+| `web` | The Next.js dashboard, the surface for people who will not install an extension: labelled sample data when signed out, the email sign-in, the live bill matching the API, and assumptions recomputing in place. Builds and serves the app against the same stand-in API, and skips with a message if `web/node_modules` is absent |
 | `theme` | That the panel belongs on the page: follows the console's light/dark theme live, uses the console's type and colour, re-attaches when the SPA removes it, and stays out of the console's tab order until it is opened |
 
 ## Notes for anyone extending these
@@ -39,3 +40,4 @@ Set `PAISA_BROWSER` if Edge/Chrome is not in a standard location.
 - **Headings are uppercased by CSS**, so `panelDriver.has()` compares case-insensitively.
 - The panel lives in a shadow root; reach it via `PANEL_SHADOW`, not `document.querySelector`.
 - A content script runs in an isolated world, so patching `window.open` from `Runtime.evaluate` cannot observe it. Assert on the DOM the extension produced instead.
+- **Driving a React controlled input needs care.** Writing through the native value setter is standard, but a write that lands before hydration poisons React's value tracker — it initialises from the DOM value, so an identical later write reads as "no change" and state never updates. The dashboard suite always writes a scratch value first. A symptom worth recognising: the input shows the right text while the submit button stays disabled.

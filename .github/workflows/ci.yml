@@ -73,6 +73,9 @@ jobs:
         id: chrome
         with:
           chrome-version: stable
+      - name: Install the dashboard's dependencies (its suite builds and serves it)
+        run: npm ci
+        working-directory: web
       - name: Run the suites against the real unpacked extension
         env:
           PAISA_BROWSER: ${{ steps.chrome.outputs.chrome-path }}
