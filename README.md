@@ -6,6 +6,27 @@ See what your AWS bill actually costs in rupees, after forex, card markup and GS
 >
 > Work in progress for the WeMakeDevs "First Commit" hackathon (Ship It track). Every rupee figure Paisa shows is an **estimate**: GST, forex and card-markup treatment depend on your AWS entity and card issuer, so they are user settings, not hard-coded assumptions.
 
+## Try it in two minutes
+
+No account, no sign-up, no backend. It reads the figure already on your own AWS billing page.
+
+1. Download `dist/paisa-extension-0.8.0.zip` and unzip it anywhere.
+2. Open `edge://extensions` (or `chrome://extensions`), turn on **Developer mode**,
+   click **Load unpacked**, and pick the unzipped folder.
+3. Open your **AWS Billing and Cost Management** console — and reload the tab if it
+   was already open.
+4. Click the **₹ Bill** button at the bottom right.
+
+You will see your own month-to-date figure in rupees, the expected month-end bill with
+GST, and the whole conversion line by line. Nothing is sent anywhere: the conversion
+happens in your browser, and the only network call is for the public USD→INR rate.
+
+Edge reports the extension as requiring **no special permissions** — it can act only on
+`console.aws.amazon.com` and two exchange-rate APIs.
+
+If your account has no spend yet (a new or free-plan account), there is no figure to
+read and Paisa will say so rather than invent one.
+
 ## Architecture
 
 ```
