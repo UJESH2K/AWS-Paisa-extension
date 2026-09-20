@@ -1,6 +1,6 @@
 /* Same Cloudscape-derived tokens as the console panel, so the two surfaces
-   look like one product. There is no console here to match, so the theme
-   follows the operating system. */
+   look like one product. Light only: the console's default is light, and a
+   bill is a document people read and print. */
 :root {
   --bg: #ffffff;
   --raised: #fbfbfb;
@@ -27,33 +27,6 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #161d26;
-    --raised: #1b2530;
-    --line: #424650;
-    --line-soft: #232f3e;
-    --fg: #d1d5db;
-    --muted: #a4b0c0;
-    --faint: #8c8c94;
-    --accent: #42b4ff;
-    --accent-hover: #89bdee;
-    --on-accent: #000716;
-    --warn-fg: #f2cd54;
-    --warn-bg: #382a0d;
-    --warn-line: #8d6605;
-    --err-fg: #ff7a7a;
-    --err-bg: #3b1a1a;
-    --err-line: #8d2020;
-    --ok-fg: #6bdb92;
-    --ok-bg: #12261a;
-    --ok-line: #1f6b33;
-    --up: #ff7a7a;
-    --down: #6bdb92;
-    --other: #5f6b7a;
-    color-scheme: dark;
-  }
-}
 
 * { box-sizing: border-box; }
 

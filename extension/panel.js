@@ -26,9 +26,10 @@
     "*{box-sizing:border-box}",
 
     ".fab{position:fixed;right:20px;bottom:20px;z-index:2147483000;display:flex;align-items:center;gap:8px;",
-    "height:40px;padding:0 16px 0 6px;border:1px solid var(--accent);border-radius:20px;background:var(--accent);",
-    "color:var(--on-accent);font-family:var(--font);font-weight:700;font-size:14px;line-height:1;cursor:pointer;box-shadow:var(--shadow)}",
-    ".fab:hover{background:var(--accent-hover);border-color:var(--accent-hover)}",
+    "height:42px;padding:0 18px 0 10px;border:1px solid #ff9900;border-radius:21px;background:#232f3e;",
+    "color:#ffffff;font-family:var(--font);font-weight:700;font-size:14px;line-height:1;cursor:pointer;box-shadow:var(--shadow)}",
+    ".fab:hover{background:#31465f;border-color:#ffac31}",
+    ".fab .mark{width:34px;height:24px;display:block;flex:none}",
     ".fab .logo{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;",
     "border-radius:50%;background:var(--on-accent);color:var(--accent);font-size:15px;font-weight:700}",
     ".fab .amt{font-variant-numeric:tabular-nums;letter-spacing:.01em}",
@@ -478,21 +479,23 @@
       out.push(
         h("p", { class: "note", text: "This is your own figure, converted with your assumptions. No account, and nothing sent anywhere." }),
       );
-      if (state.config.configured) {
-        out.push(
-          h("div", { class: "actions" }, [
-            h("button", {
-              class: "btn primary",
-              text: "Connect an account for emails and history",
-              onclick: function () { state.view = "signin"; state.summary = null; render(); },
-            }),
-          ]),
-        );
-      }
+      out.push(
+        h("div", { class: "actions" }, [
+          h("button", { class: "btn primary", onclick: exportPdf, text: "Save as PDF" }),
+          state.config.configured
+            ? h("button", {
+                class: "btn",
+                text: "Connect an account",
+                onclick: function () { state.view = "signin"; state.summary = null; render(); },
+              })
+            : null,
+        ]),
+      );
     } else if (!state.sample) {
       out.push(
         h("div", { class: "actions" }, [
           h("button", { class: "btn primary", disabled: state.busy, onclick: emailSummary, text: state.busy ? "Working…" : "Email me this summary" }),
+          h("button", { class: "btn", onclick: exportPdf, text: "Save as PDF" }),
           h("button", { class: "btn", disabled: state.busy, onclick: function () { loadBill(true); }, text: "Refresh" }),
         ]),
         msg(state.noticeKind, state.notice),
@@ -562,6 +565,22 @@
       }
       render();
     });
+  }
+
+  // Hand the summary to the report page, which prints it. "Save as PDF" is a
+  // destination in the browser's own print dialog, so this needs no library
+  // and produces a real, shareable document.
+  function exportPdf() {
+    if (!state.summary) return;
+    try {
+      chrome.storage.local.set({ report: state.summary }, function () {
+        window.open(chrome.runtime.getURL("report.html"), "_blank", "noopener");
+      });
+    } catch (e) {
+      state.noticeKind = "err";
+      state.notice = "Couldn't open the report. Reload the page and try again.";
+      render();
+    }
   }
 
   function emailSummary() {
@@ -677,13 +696,22 @@
       root.appendChild(h("style", { text: CSS }));
     }
     fabAmt = h("span", { class: "amt", text: "Bill" });
+    var mark = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    mark.setAttribute("viewBox", "0 0 44 30");
+    mark.setAttribute("class", "mark");
+    mark.setAttribute("aria-hidden", "true");
+    mark.innerHTML =
+      '<path d="M34.2 27.5H10.6A9.6 9.6 0 0 1 9.4 8.4 12.4 12.4 0 0 1 32 5.9a8.6 8.6 0 0 1 2.2 21.6Z" ' +
+      'fill="none" stroke="#ff9900" stroke-width="3.2" stroke-linejoin="round"/>' +
+      '<text x="22" y="21.5" text-anchor="middle" font-family="Amazon Ember, Helvetica Neue, Arial, sans-serif" ' +
+      'font-size="14" font-weight="700" fill="#232f3e">₹</text>';
     fab = h("button", {
       class: "fab",
       type: "button",
       "aria-label": "Paisa: your AWS bill in rupees",
       "aria-expanded": "false",
       onclick: function () { toggle(); },
-    }, [h("span", { class: "logo", text: "₹" }), fabAmt]);
+    }, [mark, fabAmt]);
     headChip = h("span", { class: "chip", text: "Estimate" });
     body = h("div", { class: "body" });
     drawer = h("aside", { class: "drawer", role: "dialog", "aria-label": "Paisa: your AWS bill in rupees", "aria-hidden": "true" }, [
@@ -707,22 +735,10 @@
   // dark mode with a class, but the name has changed across console versions,
   // so fall back to judging the page's own background luminance, then to the
   // OS preference.
+  // Light, always. The AWS console's default is light, a bill is a document
+  // people read and print, and a dark panel on a light page read as a bolt-on.
   function detectTheme() {
-    try {
-      if (document.querySelector(".awsui-dark-mode, .awsui-polaris-dark-mode")) return "dark";
-      var el = document.body || document.documentElement;
-      if (el && el.getAttribute("data-awsui-theme") === "dark") return "dark";
-      var bg = el ? getComputedStyle(el).backgroundColor : "";
-      var m = /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+))?/.exec(bg || "");
-      var opaque = m && (m[4] === undefined || parseFloat(m[4]) > 0.1);
-      if (opaque) {
-        var lum = (0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3]) / 255;
-        return lum < 0.5 ? "dark" : "light";
-      }
-      return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    } catch (e) {
-      return "light";
-    }
+    return "light";
   }
 
   function applyTheme() {

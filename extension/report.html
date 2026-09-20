@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Paisa — AWS bill in rupees</title>
+    <style>
+      /* A document, not an app screen: printed on white, readable on paper,
+         and it must carry its own caveats because it will be forwarded to
+         someone who never saw the extension. */
+      :root {
+        --fg: #0f141a; --muted: #424650; --faint: #656871;
+        --line: #e9ebed; --line-strong: #c6c6cd; --ink: #232f3e; --orange: #ff9900;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; background: #f2f3f3; color: var(--fg);
+        font: 400 14px/1.5 "Amazon Ember", "Helvetica Neue", Roboto, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .sheet {
+        max-width: 760px; margin: 28px auto; padding: 40px 44px;
+        background: #fff; border: 1px solid var(--line); border-radius: 8px;
+      }
+      header { display: flex; align-items: center; gap: 12px; padding-bottom: 18px; border-bottom: 2px solid var(--ink); }
+      header svg { width: 44px; height: 30px; flex: none; }
+      header h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+      header .sub { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+      header .spacer { flex: 1; }
+      .chip { padding: 3px 10px; border: 1px solid #f0d17a; border-radius: 4px; background: #fffce9; color: #8d6605; font-size: 12px; font-weight: 700; }
+
+      .headline { display: flex; gap: 48px; margin: 26px 0 8px; flex-wrap: wrap; }
+      .headline .label { color: var(--muted); font-size: 13px; }
+      .headline .big { font-size: 38px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+      .headline .mid { font-size: 26px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
+      .headline .note { color: var(--faint); font-size: 12px; margin-top: 4px; }
+
+      h2 { margin: 30px 0 10px; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+      table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+      th { text-align: left; padding: 8px 0; border-bottom: 1px solid var(--line-strong); color: var(--muted); font-size: 12px; }
+      td { padding: 9px 0; border-bottom: 1px solid var(--line); }
+      td:last-child, th:last-child { text-align: right; }
+      tr.total td { font-weight: 700; border-bottom: 2px solid var(--ink); }
+      td .usd { color: var(--faint); font-size: 12px; margin-left: 8px; }
+
+      .caveat { margin-top: 26px; padding: 14px 16px; border-left: 3px solid var(--orange); background: #fffaf2; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+      footer { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--faint); font-size: 11.5px; }
+
+      .actions { max-width: 760px; margin: 0 auto 8px; display: flex; gap: 10px; justify-content: flex-end; }
+      button {
+        height: 34px; padding: 0 18px; border: 1px solid #006ce0; border-radius: 20px;
+        background: #006ce0; color: #fff; font: inherit; font-weight: 700; font-size: 13px; cursor: pointer;
+      }
+      button.ghost { background: transparent; color: #006ce0; }
+      button:hover { filter: brightness(1.08); }
+
+      @media print {
+        body { background: #fff; }
+        .actions { display: none; }
+        .sheet { margin: 0; border: 0; border-radius: 0; padding: 0; max-width: none; }
+        @page { margin: 16mm; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="actions">
+      <button id="save" type="button">Save as PDF</button>
+      <button id="close" type="button" class="ghost">Close</button>
+    </div>
+
+    <div class="sheet">
+      <header>
+        <svg viewBox="0 0 44 30" aria-hidden="true">
+          <path d="M34.2 27.5H10.6A9.6 9.6 0 0 1 9.4 8.4 12.4 12.4 0 0 1 32 5.9a8.6 8.6 0 0 1 2.2 21.6Z"
+                fill="none" stroke="#ff9900" stroke-width="3.2" stroke-linejoin="round"/>
+          <text x="22" y="21.5" text-anchor="middle" font-family="Amazon Ember, Helvetica Neue, Arial, sans-serif"
+                font-size="14" font-weight="700" fill="#232f3e">&#8377;</text>
+        </svg>
+        <div>
+          <h1>AWS bill in rupees</h1>
+          <p class="sub" id="period">—</p>
+        </div>
+        <span class="spacer"></span>
+        <span class="chip">Estimate</span>
+      </header>
+
+      <div class="headline">
+        <div>
+          <div class="label" id="soFarLabel">Charged so far</div>
+          <div class="big" id="soFar">—</div>
+          <div class="note" id="soFarNote"></div>
+        </div>
+        <div>
+          <div class="label">Expected bill this month</div>
+          <div class="mid" id="projection">—</div>
+          <div class="note" id="projectionNote"></div>
+        </div>
+      </div>
+
+      <h2>How the figure is built</h2>
+      <table>
+        <tbody id="breakdown"></tbody>
+      </table>
+
+      <div id="servicesBlock" hidden>
+        <h2>By service</h2>
+        <table>
+          <thead><tr><th>Service</th><th>Cost</th></tr></thead>
+          <tbody id="services"></tbody>
+        </table>
+      </div>
+
+      <div class="caveat" id="caveat"></div>
+
+      <footer id="footer"></footer>
+    </div>
+
+    <script src="convert.js"></script>
+    <script src="report.js"></script>
+  </body>
+</html>

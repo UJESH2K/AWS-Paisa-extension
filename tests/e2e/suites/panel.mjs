@@ -110,6 +110,30 @@ try {
   c.check("the session is held by the extension", (await storage("session"))?.email, "owner@example.com");
   if (shotDir) await page.screenshot(`${shotDir}/panel-bill.png`);
 
+  // ---- the printable report ----
+  // "Save as PDF" writes the summary to storage and opens a report page. What
+  // matters is that the document carries its own caveats: whoever opens the PDF
+  // never saw the extension.
+  c.check("the bill offers a PDF export", await d.click("Save as PDF"), true);
+  // The panel writes the summary to storage, then opens the report page.
+  let wroteReport = false;
+  for (let i = 0; i < 20 && !wroteReport; i++) {
+    wroteReport = !!(await storage("report"));
+    if (!wroteReport) await sleep(300);
+  }
+  c.check("the summary is handed to the report page", wroteReport, true);
+  const reportUrl = `chrome-extension://${extensionId}/report.html`;
+  const report = await openPage(PORT, reportUrl);
+  await report.waitFor("document.getElementById('soFar').textContent !== '—'", 10000);
+  const doc = await report.ev("document.body.innerText");
+  c.check("the report shows the same total as the panel", doc.includes(inr0(total).replace(/[^\d,₹]/g, "").slice(0, 5)), true);
+  c.check("it breaks the conversion out", doc, (s) => s.includes("per USD") && s.includes("GST,"));
+  c.check("it carries the estimate caveat on its own", doc, (s) => s.includes("Every figure here is an estimate"));
+  c.check("it names the rate's source", doc, (s) => s.toLowerCase().includes("mid-market"));
+  c.check("and states it is not an AWS product", doc, (s) => s.includes("not affiliated with Amazon Web Services"));
+  if (shotDir) await report.screenshot(`${shotDir}/report.png`);
+
+
   // ---- email and refresh ----
   await d.click("Email me this summary");
   c.check("emailing the summary confirms where it went", await d.has("Sent to owner@example.com"), true);
@@ -233,7 +257,7 @@ try {
   c.check("and the scanner never badges the panel itself", await billing.ev(`${PANEL_SHADOW}.querySelectorAll('[data-paisa]').length`), 0);
   if (shotDir) await billing.screenshot(`${shotDir}/panel-over-billing.png`);
 
-  const errors = [...page.errors, ...ext.errors, ...empty.errors, ...stuck.errors, ...billing.errors];
+  const errors = [...page.errors, ...ext.errors, ...report.errors, ...empty.errors, ...stuck.errors, ...billing.errors];
   c.check("no console errors", errors.length, 0);
   if (errors.length) console.log(errors);
 } finally {

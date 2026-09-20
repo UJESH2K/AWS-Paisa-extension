@@ -19,8 +19,8 @@ try {
     const s=getComputedStyle(${PANEL_SHADOW}.querySelector('.fab'));
     return {bg:s.backgroundColor, radius:s.borderRadius, font:s.fontFamily};
   })()`);
-  c.check("the button uses the console's blue", fab.bg, "rgb(0, 108, 224)");
-  c.check("the button is pill-shaped, like a console button", fab.radius, "20px");
+  c.check("the button uses AWS's squid ink", fab.bg, "rgb(35, 47, 62)");
+  c.check("the button is pill-shaped, like a console button", fab.radius, "21px");
   c.check("the console font stack is applied", fab.font, (s) => s.replace(/"/g, "").startsWith("Amazon Ember"));
 
   await light.ev(`${PANEL_SHADOW}.querySelector('.fab').click()`);
@@ -32,30 +32,27 @@ try {
   );
   if (shotDir) await light.screenshot(`${shotDir}/panel-light.png`);
 
-  // ---- a dark console ----
+  // ---- a dark console: the panel stays light on purpose ----
+  // A bill is a document. Following the console into dark mode made it harder
+  // to read and to print, so the panel is light everywhere now.
   const dark = await openPage(PORT, `${SITE}/console-dark.html`);
   await dark.waitFor(`!!${PANEL_HOST}`);
   await sleep(600);
-  c.check("on a dark console the panel is dark", await dark.ev(`${PANEL_HOST}.getAttribute('data-theme')`), "dark");
+  c.check("on a dark console the panel stays light", await dark.ev(`${PANEL_HOST}.getAttribute('data-theme')`), "light");
   await dark.ev(`${PANEL_SHADOW}.querySelector('.fab').click()`);
   await sleep(400);
   c.check(
-    "the drawer is dark too",
+    "the drawer is still readable white",
     await dark.ev(`getComputedStyle(${PANEL_SHADOW}.querySelector('.drawer')).backgroundColor`),
-    "rgb(22, 29, 38)",
+    "rgb(255, 255, 255)",
   );
   c.check(
-    "and the accent is the dark-mode blue",
-    await dark.ev(`getComputedStyle(${PANEL_SHADOW}.querySelector('.fab')).backgroundColor`),
-    "rgb(66, 180, 255)",
+    "the button wears the AWS palette",
+    await dark.ev(`(()=>{const s=getComputedStyle(${PANEL_SHADOW}.querySelector('.fab')); return s.backgroundColor + ' / ' + s.borderTopColor})()`),
+    "rgb(35, 47, 62) / rgb(255, 153, 0)",
   );
-  if (shotDir) await dark.screenshot(`${shotDir}/panel-dark.png`);
-
-  // ---- the user toggles the console's own theme while we are open ----
-  await dark.ev("document.body.classList.remove('awsui-dark-mode'); document.body.style.background='#ffffff'");
-  c.check("it follows the console switching to light", await dark.waitFor(`${PANEL_HOST}.getAttribute('data-theme')==='light'`, 6000), true);
-  await dark.ev("document.body.classList.add('awsui-dark-mode'); document.body.style.background='#0f1b2a'");
-  c.check("and back to dark", await dark.waitFor(`${PANEL_HOST}.getAttribute('data-theme')==='dark'`, 6000), true);
+  c.check("and carries a mark, not a bare glyph", await dark.ev(`!!${PANEL_SHADOW}.querySelector('.fab svg.mark')`), true);
+  if (shotDir) await dark.screenshot(`${shotDir}/panel-on-dark-console.png`);
 
   // ---- usable without a mouse ----
   const light2 = await openPage(PORT, `${SITE}/home.html`);
@@ -91,7 +88,7 @@ try {
   await dark.ev("document.getElementById('wipe') && document.getElementById('wipe').click()");
   await dark.ev(`${PANEL_HOST} && ${PANEL_HOST}.remove()`);
   c.check("it re-attaches after the console removes it", await dark.waitFor(`!!${PANEL_HOST}`, 8000), true);
-  c.check("and is still themed correctly", await dark.ev(`${PANEL_HOST}.getAttribute('data-theme')`), "dark");
+  c.check("and is still themed correctly", await dark.ev(`${PANEL_HOST}.getAttribute('data-theme')`), "light");
 
   const errors = [...light.errors, ...light2.errors, ...dark.errors];
   c.check("no uncaught exceptions", errors.length, 0);
