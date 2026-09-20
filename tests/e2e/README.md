@@ -22,6 +22,12 @@ The suites are hermetic: the exchange rate comes from a local fixture via the bu
 
 Set `PAISA_BROWSER` if Edge/Chrome is not in a standard location.
 
+**These suites need Edge, not Chrome.** Chrome 137+ ignores `--load-extension`, so an
+automated run there silently loads Chrome's own component extensions instead of ours —
+which is exactly the false positive to watch for if you loosen the service-worker check
+in `launch()`. The extension itself works in Chrome; it just has to be loaded by hand via
+`chrome://extensions` → Developer mode → Load unpacked.
+
 ## Suites
 
 | Suite | What it covers |
