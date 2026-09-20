@@ -62,7 +62,7 @@ npm run dev
 ## Tests
 
 ```
-python -m pytest backend/tests     # 79 tests: conversion maths, auth, caching,
+python -m pytest backend/tests     # 101 tests: conversion maths, auth, caching,
                                    # spend sources, emails, API routes (moto, no AWS)
 python tests/e2e/run.py            # 6 browser suites (138 checks): the extension and the dashboard
 cd web && npm run lint && npm run build
@@ -70,6 +70,8 @@ cd web && npm run lint && npm run build
 
 The backend tests use `moto`, so they exercise the real DynamoDB/SNS/CloudWatch
 code paths without touching an AWS account: `pip install -r backend/requirements-dev.txt`.
+They cover 98% of `backend/src`, and CI fails below 95%. Add `--cov=backend/src
+--cov-report=term-missing` to see the gaps.
 The browser suites need Node and Edge or Chrome; see `tests/e2e/README.md`.
 
 `python scripts/check_aws.py` reports whether this machine can deploy at all,

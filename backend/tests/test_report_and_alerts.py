@@ -105,3 +105,69 @@ def test_threshold_alert_fires_once_per_month(owner, outbox):
 def test_unconfirmed_users_are_skipped(owner, outbox):
     outbox.confirmed = False
     assert alert_checker.run(datetime(2026, 9, 15, 1, tzinfo=timezone.utc)) == {}
+
+
+def test_one_users_failure_does_not_stop_the_others(fx, monkeypatch, outbox):
+    """The daily job runs for everyone. A single broken account must not mean
+    nobody gets their summary — this is claimed in the code and the docs, so
+    it is worth holding to."""
+    import alert_checker
+
+    good = {"pk": "user#good", "email": OWNER, "externalId": "e", "topicArn": "arn:good", "settings": {}}
+    broken = {"pk": "user#broken", "email": "broken@example.com", "externalId": "e", "topicArn": "arn:broken", "settings": {}}
+    for u in (broken, good):  # broken first, so it fails before the good one runs
+        users_table().put_item(Item=to_ddb(u))
+
+    real_send = email_handler.send_summary
+
+    def send(user, kind="projection", now=None):
+        if user["pk"] == "user#broken":
+            raise RuntimeError("Cost Explorer exploded for this account")
+        return real_send(user, kind, now)
+
+    monkeypatch.setattr(alert_checker.email_handler, "send_summary", send)
+    sent = alert_checker.run(datetime(2026, 9, 15, 1, tzinfo=timezone.utc))
+    assert "user#good" in sent, "the healthy account should still have been emailed"
+    assert "user#broken" not in sent
+    assert len(outbox.sent) == 1
+
+
+def test_every_user_is_visited_even_across_scan_pages(fx, monkeypatch, outbox):
+    """DynamoDB scans are paginated; missing the second page would silently
+    skip users."""
+    import alert_checker
+    from common import users_table as real_table
+
+    for i in range(3):
+        users_table().put_item(Item=to_ddb({"pk": f"user#u{i}", "email": OWNER, "externalId": "e", "topicArn": f"arn:{i}", "settings": {}}))
+
+    table = real_table()
+    real_scan = table.scan
+    pages = {"n": 0}
+
+    def paged_scan(**kwargs):
+        # Force one item per page so the continuation path is exercised.
+        result = real_scan(**{**kwargs, "Limit": 1})
+        pages["n"] += 1
+        return result
+
+    monkeypatch.setattr(alert_checker, "users_table", lambda: type("T", (), {"scan": staticmethod(paged_scan), "update_item": table.update_item})())
+    seen = list(alert_checker._all_users())
+    assert len(seen) == 3, f"expected all three users, saw {len(seen)} over {pages['n']} pages"
+    assert pages["n"] >= 3
+
+
+def test_email_lists_everything_else_when_spend_is_spread_out():
+    s = report.build_summary(
+        {"usd": 100.0, "services": [{"name": f"Svc{i}", "usd": 10.0} for i in range(8)]},
+        FX,
+        SETTINGS,
+        10,
+        30,
+        "2026-09",
+        "2026-09-10",
+    )
+    _, message = report.email_text(s)
+    assert "Everything else" in message
+    # Five named services plus the remainder must account for the whole bill.
+    assert s["otherUsd"] == pytest.approx(50.0)
