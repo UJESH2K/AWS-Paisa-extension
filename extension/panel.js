@@ -149,6 +149,53 @@
     return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(iso + "T00:00:00Z"));
   }
 
+  // ---- a bill from the page itself ----------------------------------------
+  // The content script reads the console's own dollar figure. That is enough
+  // to show a real, personal conversion with no backend at all, which is what
+  // someone gets the instant they install this. The server adds history,
+  // emails and per-service detail; it is not needed for the core answer.
+  function billFromPage(cb) {
+    chrome.storage.local.get({ history: [], fx: null, settings: null, scan: null }, function (d) {
+      var s = Object.assign({}, C.DEFAULT_SETTINGS, d.settings || {});
+      var fxRate = (typeof s.manualFx === "number" && s.manualFx > 0) ? s.manualFx : (d.fx && d.fx.rate);
+      var readings = (d.history || []).filter(function (h) { return h.src === "page"; });
+      var latest = readings[readings.length - 1];
+      if (!latest || !fxRate) return cb(null);
+
+      var now = new Date();
+      var dim = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
+      var day = Math.max(1, now.getUTCDate());
+      var r = C.convert({
+        usd: latest.usd, fx: fxRate, entity: s.entity, markupPct: s.markupPct, gstPct: s.gstPct,
+        daysElapsed: day, daysInMonth: dim,
+      });
+      // Only claim "this page" when the figure really is on the page in front
+      // of them; otherwise it is the last one we read, and we say when.
+      var here = location.origin + location.pathname;
+      var onThisPage = !!(d.scan && d.scan.primary && d.scan.url === here);
+      var readAt = new Date(latest.seenAt || latest.t);
+      cb({
+        month: now.toISOString().slice(0, 7),
+        asOf: now.toISOString().slice(0, 10),
+        usd: latest.usd,
+        fx: { rate: fxRate, fetchedAt: (d.fx && d.fx.fetchedAt) || "", source: (d.fx && d.fx.source) || "your override" },
+        settings: { entity: s.entity, markup_pct: s.markupPct, gst_pct: s.gstPct },
+        breakdown: { base: r.base, markup: r.markup, gst: r.gst, total: r.total },
+        projection: r.projection,
+        services: [],
+        otherUsd: 0,
+        otherInr: 0,
+        daysElapsed: day,
+        daysInMonth: dim,
+        fromPage: true,
+        onThisPage: onThisPage,
+        pageLabel: latest.label,
+        readAt: readAt.toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }),
+        providerNote: "Read from your AWS console, not from an account connection. Connect an account for per-service detail, month-end alerts and emailed summaries.",
+      });
+    });
+  }
+
   // ---- sample data (clearly labelled) -------------------------------------
   function sampleSummary() {
     var s = { entity: "AWS_INC", markup_pct: 0.035, gst_pct: 0.18 };
@@ -384,6 +431,11 @@
 
     var out = [];
     if (state.sample) out.push(h("div", { class: "banner", text: "Sample data, not your account." }));
+    else if (s.fromPage) {
+      out.push(h("div", { class: "banner", text: s.onThisPage
+        ? "Converted from the " + (s.pageLabel || "figure") + " shown on this page."
+        : "Your last reading, from " + (s.pageLabel || "your billing page") + " at " + s.readAt + "." }));
+    }
     out.push(
       h("div", { class: "card" }, [
         h("div", { class: "eyebrow", text: "So far · " + monthName(s.month) }),
@@ -420,7 +472,24 @@
         )),
       );
     }
-    if (!state.sample) {
+    if (s.fromPage) {
+      // Everything here came from the page and the user's own settings, so the
+      // only thing left to offer is what an account would add.
+      out.push(
+        h("p", { class: "note", text: "This is your own figure, converted with your assumptions. No account, and nothing sent anywhere." }),
+      );
+      if (state.config.configured) {
+        out.push(
+          h("div", { class: "actions" }, [
+            h("button", {
+              class: "btn primary",
+              text: "Connect an account for emails and history",
+              onclick: function () { state.view = "signin"; state.summary = null; render(); },
+            }),
+          ]),
+        );
+      }
+    } else if (!state.sample) {
       out.push(
         h("div", { class: "actions" }, [
           h("button", { class: "btn primary", disabled: state.busy, onclick: emailSummary, text: state.busy ? "Working…" : "Email me this summary" }),
@@ -432,7 +501,7 @@
       out.push(h("div", { class: "actions" }, [h("button", { class: "btn primary", onclick: function () { state.sample = false; state.summary = null; init(); }, text: state.session ? "Show my bill" : "Sign in for my real bill" })]));
     }
     var foot = [h("span", { text: "Rate " + C.inr(s.fx.rate, 2) + "/USD · " + (s.fx.source || "public source") })];
-    if (state.session && !state.sample) {
+    if (state.session && !state.sample && !s.fromPage) {
       foot.push(h("span", { text: state.session.email }), h("button", { class: "link", onclick: signOut, text: "Sign out" }));
     }
     if (globalThis.PaisaScan) foot.push(h("button", { class: "link", onclick: copyReport, text: "Copy page report" }));
@@ -538,18 +607,22 @@
     // showing a sign-in form that can't work.
     chrome.runtime.sendMessage({ type: "config" }, function (cfg) {
       if (!chrome.runtime.lastError && cfg) state.config = cfg;
-      if (!chrome.runtime.lastError && cfg && !cfg.configured) {
-        state.view = "setup";
-        render();
-        return;
-      }
+      var configured = !chrome.runtime.lastError && cfg && cfg.configured;
       chrome.storage.local.get({ session: null }, function (d) {
         state.session = d.session;
-        if (state.session) loadBill(false);
-        else {
-          state.view = "signin";
+        if (configured && state.session) return loadBill(false);
+        // No account: convert what is on the page in front of them. That is a
+        // real figure from their own console, not a sample.
+        billFromPage(function (bill) {
+          if (bill) {
+            state.summary = bill;
+            state.sample = false;
+            state.view = "bill";
+          } else {
+            state.view = configured ? "signin" : "setup";
+          }
           render();
-        }
+        });
       });
     });
   }

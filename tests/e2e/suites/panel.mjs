@@ -19,18 +19,37 @@ try {
   const setStorage = (obj) => ext.ev(`new Promise(r=>chrome.storage.local.set(${JSON.stringify(obj)},()=>r(true)))`);
 
   if (NO_API) {
-    // A build with no server must say so, not show a sign-in form that cannot work.
-    const page = await openPage(PORT, `${SITE}/home.html`);
-    const d = panelDriver(page);
-    c.check("the button still appears on a non-billing console page", await page.waitFor(`!!${PANEL_HOST}`), true);
-    await d.open();
-    c.check("it admits there is no server configured", await d.has("Not connected yet"), true);
-    await d.click("See a sample bill");
-    await sleep(300);
-    const text = await d.text();
-    c.check("the sample is labelled as sample data", text.includes("Sample data, not your account."), true);
-    c.check("and still shows a rupee total", text.toLowerCase().includes("so far"), true);
-    c.check("no console errors", [...page.errors, ...ext.errors].length, 0);
+    // With no server at all — which is what anyone gets the moment they install
+    // the extension — the panel must still answer the question, using the
+    // figure on the page in front of them.
+    const billing = await openPage(PORT, `${SITE}/billing.html`);
+    const bd = panelDriver(billing);
+    await billing.waitFor("!!document.querySelector('.paisa-badge')", 20000);
+    await sleep(1500);
+    c.check("the button appears with no backend configured", await billing.waitFor(`!!${PANEL_HOST}`), true);
+    await bd.open();
+    await sleep(1200);
+    const text = await bd.text();
+    c.check("it converts the page's own figure, with no account", text.toLowerCase().includes("so far"), true);
+    c.check("and says where that figure came from", text, (s) => s.includes("Converted from the") && s.includes("shown on this page"));
+    c.check("it is not passed off as sample data", text, (s) => !s.includes("Sample data, not your account."));
+    c.check("the full conversion is shown", text, (s) => ["Card forex markup", "GST", "Total so far (estimate)"].every((x) => s.includes(x)));
+    c.check("it is explicit that nothing was sent anywhere", text, (s) => s.includes("nothing sent anywhere"));
+
+    // On a page with no figure at all there is nothing honest to convert.
+    const home = await openPage(PORT, `${SITE}/home.html`);
+    const hd = panelDriver(home);
+    await home.waitFor(`!!${PANEL_HOST}`);
+    await hd.open();
+    await sleep(1200);
+    // On a page with no figure of its own, the last reading is still useful —
+    // but it must not be described as being on this page.
+    const awayText = await hd.text();
+    c.check("away from a billing page it shows the last reading", awayText.toLowerCase().includes("so far"), true);
+    c.check("and says it is the last one, with when", awayText, (s) => s.includes("Your last reading, from"));
+    c.check("without claiming the figure is on this page", awayText, (s) => !s.includes("shown on this page"));
+
+    c.check("no console errors", [...billing.errors, ...home.errors, ...ext.errors].length, 0);
     proc.kill();
     process.exit(c.summary() ? 0 : 1);
   }

@@ -1,20 +1,137 @@
 <!doctype html>
-<html>
-<body style="font-family:Arial;padding:30px;background:#f2f3f3">
-<h1>Billing and Cost Management</h1>
-<div id="mtd" style="background:#fff;padding:20px;margin:10px 0;width:420px">
-  <h3>Month-to-date cost</h3>
-  <div id="big" style="font-size:40px"><span>$</span><span id="n">47.30</span></div>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Billing and Cost Management</title>
+<style>
+  /* Styled to match the AWS console (Cloudscape) closely enough that the
+     extension is seen in its real context. It is still a local stand-in, and
+     says so — filming this and calling it a live account would be dishonest. */
+  :root {
+    --bg: #f2f3f3; --surface: #ffffff; --line: #e9ebed; --line-strong: #c6c6cd;
+    --fg: #0f141a; --muted: #424650; --faint: #656871; --link: #006ce0;
+    --nav: #232f3e; --nav-2: #1b2532;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 400 14px/1.45 "Amazon Ember", "Helvetica Neue", Roboto, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .topnav {
+    display: flex; align-items: center; gap: 22px;
+    height: 40px; padding: 0 20px; background: var(--nav); color: #fff; font-size: 13px;
+  }
+  .topnav .logo { font-weight: 700; letter-spacing: -0.02em; font-size: 17px; }
+  .topnav .spacer { flex: 1; }
+  .topnav .item { color: #d5dbdb; }
+  .subnav {
+    display: flex; align-items: center; gap: 20px;
+    height: 36px; padding: 0 20px; background: var(--nav-2); color: #d5dbdb; font-size: 13px;
+  }
+  .demo-strip {
+    padding: 6px 20px; background: #fffce9; border-bottom: 1px solid #f0d17a;
+    color: #8d6605; font-size: 12px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
+  .crumb { color: var(--faint); font-size: 12px; margin-bottom: 6px; }
+  h1 { margin: 0 0 4px; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+  .lede { margin: 0 0 22px; color: var(--muted); font-size: 14px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; margin-bottom: 18px;
+  }
+  .card > header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 14px 20px; border-bottom: 1px solid var(--line);
+  }
+  .card h2 { margin: 0; font-size: 17px; font-weight: 700; }
+  .card .body { padding: 20px; }
+  /* The real console gives these figures room; a 200px column makes the
+     rupee badge wrap, which is correct but not what we want to film. */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 28px; }
+  .label { color: var(--muted); font-size: 13px; margin-bottom: 6px; }
+  .figure { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+  .figure.small { font-size: 24px; }
+  .sub { margin-top: 4px; color: var(--faint); font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; padding: 10px 20px; border-bottom: 1px solid var(--line);
+       color: var(--muted); font-size: 12px; font-weight: 700; }
+  td { padding: 12px 20px; border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: 0; }
+  td.amount { text-align: right; font-variant-numeric: tabular-nums; }
+  .note { color: var(--faint); font-size: 13px; }
+  .note + .note { margin-top: 8px; }
+  a { color: var(--link); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<div class="topnav">
+  <span class="logo">aws</span>
+  <span class="item">Services</span>
+  <span class="spacer"></span>
+  <span class="item">Mumbai</span>
+  <span class="item">ujex</span>
 </div>
-<div style="background:#fff;padding:20px;margin:10px 0;width:420px">
-  <h3>Forecasted month-end cost</h3>
-  <div style="font-size:24px">$81.02</div>
+<div class="subnav">
+  <span>Billing and Cost Management</span>
+  <span>Bills</span>
+  <span>Payments</span>
+  <span>Cost Explorer</span>
+  <span>Budgets</span>
 </div>
-<table style="background:#fff;width:420px">
-  <tr><td>Amazon EC2</td><td>$18.62</td></tr>
-  <tr><td>Amazon S3</td><td>$6.85</td></tr>
-</table>
-<p>Credits applied: -$5.00</p>
-<p>Your free tier allows up to $10 in usage before charges begin.</p>
+<div class="demo-strip">
+  Stand-in page served from localhost for demonstrating the Paisa extension. Not a live AWS account.
+</div>
+
+<div class="wrap">
+  <div class="crumb">Billing and Cost Management &rsaquo; Home</div>
+  <h1>Billing and Cost Management</h1>
+  <p class="lede">Your costs for September 2026, in the currency your account is billed in.</p>
+
+  <section class="card">
+    <header><h2>Cost summary</h2><a href="#">View bill</a></header>
+    <div class="body">
+      <div class="grid">
+        <div id="mtd">
+          <div class="label">Month-to-date cost</div>
+          <div id="big" class="figure"><span>$</span><span id="n">47.30</span></div>
+          <div class="sub">1&ndash;20 September 2026</div>
+        </div>
+        <div>
+          <div class="label">Forecasted month-end cost</div>
+          <div class="figure small">$81.02</div>
+          <div class="sub">Based on your usage so far</div>
+        </div>
+        <div>
+          <div class="label">Last month's total cost</div>
+          <div class="figure small">&ndash;</div>
+          <div class="sub">No charges in August 2026</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <header><h2>Cost breakdown by service</h2><a href="#">Open Cost Explorer</a></header>
+    <table>
+      <thead><tr><th>Service</th><th style="text-align:right">Month-to-date</th></tr></thead>
+      <tbody>
+        <tr><td>Amazon EC2</td><td class="amount">$18.62</td></tr>
+        <tr><td>Amazon S3</td><td class="amount">$6.85</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <header><h2>Credits and free tier</h2></header>
+    <div class="body">
+      <p class="note">Credits applied: -$5.00</p>
+      <p class="note">Your free tier allows up to $10 in usage before charges begin.</p>
+    </div>
+  </section>
+</div>
+
 </body>
 </html>
